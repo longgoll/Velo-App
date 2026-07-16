@@ -3,6 +3,7 @@ import { useChatStore } from '@/store/useChatStore';
 import { useQuery } from '@tanstack/react-query';
 import type { Channel } from '@/types';
 import { Search, Hash, Volume2, ShieldAlert, Sparkles } from 'lucide-react';
+import { toast } from '@/store/useToastStore';
 
 export default function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
@@ -106,7 +107,7 @@ export default function CommandPalette() {
       setActiveVoiceChannelId(item.channel.id);
       setActiveChannelId(item.channel.id);
     } else if (item.type === 'command') {
-      alert(`Đã thực thi lệnh trạng thái: ${item.title}`);
+      toast.info(`Đã thực thi lệnh trạng thái: ${item.title}`);
     }
     setIsOpen(false);
     setQuery('');

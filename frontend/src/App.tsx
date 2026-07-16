@@ -10,6 +10,11 @@ import JoinWorkspaceModal from '@/features/workspace/components/JoinWorkspaceMod
 import CreateChannelModal from '@/features/workspace/components/CreateChannelModal';
 import CommandPalette from '@/components/ui/CommandPalette';
 import { useChatStore } from '@/store/useChatStore';
+import { useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
+import Toaster from '@/components/ui/Toaster';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { toast } from '@/store/useToastStore';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
@@ -22,7 +27,10 @@ export default function App() {
     setShowJoinWs,
     showCreateChan,
     setShowCreateChan,
+    setActiveWorkspaceId,
   } = useChatStore();
+
+  const queryClient = useQueryClient();
 
   // WebSocket connection
   const { sendMessage } = useWebSocket(token);
@@ -36,6 +44,30 @@ export default function App() {
       }
     }
   }, [token]);
+
+  // Handle direct invite link
+  useEffect(() => {
+    if (token) {
+      const params = new URLSearchParams(window.location.search);
+      const inviteCode = params.get('invite');
+      if (inviteCode && inviteCode.trim()) {
+        const joinWorkspace = async () => {
+          try {
+            const res = await api.post('/workspaces/join', { invite_code: inviteCode.trim() });
+            queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+            setActiveWorkspaceId(res.data.id);
+            toast.success(`Đã gia nhập Không gian làm việc "${res.data.name}" thành công qua mã mời!`);
+          } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Mã mời không hợp lệ hoặc đã hết hạn.');
+          } finally {
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+          }
+        };
+        joinWorkspace();
+      }
+    }
+  }, [token, queryClient, setActiveWorkspaceId]);
 
   const handleAuthSuccess = (newToken: string, newUser: UserData) => {
     localStorage.setItem('token', newToken);
@@ -78,6 +110,10 @@ export default function App() {
       
       {/* Omni-Command Palette */}
       <CommandPalette />
+
+      {/* Global notifications and confirmation dialogs */}
+      <Toaster />
+      <ConfirmDialog />
     </div>
   );
 }

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
-import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe, Bell } from 'lucide-react';
+import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe, Bell, Settings } from 'lucide-react';
 import api from '@/lib/api';
 import type { Channel, Workspace, DMChannel, WorkspaceMember } from '@/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getAvatarGradient } from '@/lib/utils';
+import WorkspaceSettingsModal from '@/features/workspace/components/WorkspaceSettingsModal';
 
 // Mock data for Communities
 const MOCK_COMMUNITIES = [
@@ -38,6 +39,7 @@ export default function ContentExplorer() {
   const [voiceFolderOpen, setVoiceFolderOpen] = useState(true);
   const [dmSearch, setDmSearch] = useState('');
   const [wsDropdownOpen, setWsDropdownOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Keyboard shortcut Ctrl+B / Cmd+B to toggle explorer
   useEffect(() => {
@@ -148,7 +150,7 @@ export default function ContentExplorer() {
       const res = await api.get(`/workspaces/${activeWorkspaceId}/members`);
       return res.data;
     },
-    enabled: !!activeWorkspaceId && activeFilter === 'dms',
+    enabled: !!activeWorkspaceId,
   });
 
   // Fetch active DM channels
@@ -165,6 +167,10 @@ export default function ContentExplorer() {
   // Current logged in user info
   const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+
+  const myMemberRecord = members.find((m) => m.user_id === currentUser?.id);
+  const myRole = myMemberRecord?.role || 'member';
+  const isOwnerOrAdmin = myRole === 'owner' || myRole === 'admin';
 
   const handleMemberClick = async (recipientId: string) => {
     try {
@@ -331,6 +337,21 @@ export default function ContentExplorer() {
                     <Compass className="w-3.5 h-3.5" />
                     Tham gia không gian
                   </button>
+                  {activeWorkspaceId && (
+                    <>
+                      <div className="border-t border-zinc-800/60 my-1.5" />
+                      <button
+                        onClick={() => {
+                          setShowSettings(true);
+                          setWsDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition flex items-center gap-2 cursor-pointer outline-none border-0"
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                        Cài đặt không gian
+                      </button>
+                    </>
+                  )}
                   {workspaces.length === 0 && (
                     <div className="text-zinc-600 text-xs px-2 py-2 italic text-center">Chưa có không gian nào</div>
                   )}
@@ -353,15 +374,17 @@ export default function ContentExplorer() {
                         {textFolderOpen ? <FolderOpen className="w-3.5 h-3.5 text-indigo-400" /> : <Folder className="w-3.5 h-3.5 text-indigo-500" />}
                         <span className="text-[10px] font-bold uppercase tracking-wider">Kênh chữ</span>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowCreateChan(true);
-                        }}
-                        className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-zinc-800 hover:text-white rounded transition outline-none"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+                      {isOwnerOrAdmin && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCreateChan(true);
+                          }}
+                          className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-zinc-800 hover:text-white rounded transition outline-none cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
 
                     {textFolderOpen && (
@@ -407,15 +430,17 @@ export default function ContentExplorer() {
                         {voiceFolderOpen ? <FolderOpen className="w-3.5 h-3.5 text-emerald-400" /> : <Folder className="w-3.5 h-3.5 text-emerald-500" />}
                         <span className="text-[10px] font-bold uppercase tracking-wider">Kênh thoại</span>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowCreateChan(true);
-                        }}
-                        className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-zinc-800 hover:text-white rounded transition outline-none"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+                      {isOwnerOrAdmin && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCreateChan(true);
+                          }}
+                          className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-zinc-800 hover:text-white rounded transition outline-none cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
 
                     {voiceFolderOpen && (
@@ -725,6 +750,14 @@ export default function ContentExplorer() {
             {activeWorkspaceId}
           </span>
         </div>
+      )}
+
+      {activeWorkspaceId && (
+        <WorkspaceSettingsModal
+          open={showSettings}
+          onOpenChange={setShowSettings}
+          workspaceId={activeWorkspaceId}
+        />
       )}
     </div>
   );

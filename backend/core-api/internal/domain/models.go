@@ -1,11 +1,23 @@
 package domain
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+const idLetterBytes = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+func generateRandomWorkspaceID(n int) string {
+	b := make([]byte, n)
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := range b {
+		b[i] = idLetterBytes[rng.Intn(len(idLetterBytes))]
+	}
+	return string(b)
+}
 
 type User struct {
 	ID        string         `gorm:"primaryKey;type:varchar(36)" json:"id"`
@@ -25,18 +37,22 @@ func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 type Workspace struct {
-	ID        string         `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	Name      string         `gorm:"type:varchar(150);not null" json:"name"`
-	OwnerID   string         `gorm:"type:varchar(36);not null" json:"owner_id"`
-	Owner     User           `gorm:"foreignKey:OwnerID" json:"-"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID         string         `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	Name       string         `gorm:"type:varchar(150);not null" json:"name"`
+	OwnerID    string         `gorm:"type:varchar(36);not null" json:"owner_id"`
+	InviteCode string         `gorm:"type:varchar(10);uniqueIndex" json:"invite_code"`
+	Owner      User           `gorm:"foreignKey:OwnerID" json:"-"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (w *Workspace) BeforeCreate(tx *gorm.DB) (err error) {
 	if w.ID == "" {
-		w.ID = uuid.New().String()
+		w.ID = generateRandomWorkspaceID(8)
+	}
+	if w.InviteCode == "" {
+		w.InviteCode = w.ID
 	}
 	return
 }

@@ -2,11 +2,23 @@ package postgres
 
 import (
 	"errors"
+	"math/rand"
 	"time"
 
 	"github.com/hoanglong/chat/backend/core-api/internal/domain"
 	"gorm.io/gorm"
 )
+
+const letterBytes = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+func generateRandomInviteCode(n int) string {
+	b := make([]byte, n)
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := range b {
+		b[i] = letterBytes[rng.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
 
 type workspaceGormRepository struct {
 	db *gorm.DB
@@ -114,4 +126,50 @@ func (r *workspaceGormRepository) ListDMChannelsForUser(workspaceID, userID stri
 		Order("created_at desc").
 		Find(&dms).Error
 	return dms, err
+}
+
+func (r *workspaceGormRepository) Update(workspace *domain.Workspace) error {
+	return r.db.Save(workspace).Error
+}
+
+func (r *workspaceGormRepository) Delete(id string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Delete workspace members
+		if err := tx.Where("workspace_id = ?", id).Delete(&domain.WorkspaceMember{}).Error; err != nil {
+			return err
+		}
+		// Delete channels
+		if err := tx.Where("workspace_id = ?", id).Delete(&domain.Channel{}).Error; err != nil {
+			return err
+		}
+		// Delete DM channels
+		if err := tx.Where("workspace_id = ?", id).Delete(&domain.DMChannel{}).Error; err != nil {
+			return err
+		}
+		// Delete workspace itself
+		return tx.Where("id = ?", id).Delete(&domain.Workspace{}).Error
+	})
+}
+
+func (r *workspaceGormRepository) GetByInviteCode(code string) (*domain.Workspace, error) {
+	var workspace domain.Workspace
+	err := r.db.Where("invite_code = ?", code).First(&workspace).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &workspace, nil
+}
+
+func (r *workspaceGormRepository) UpdateMemberRole(workspaceID, userID, role string) error {
+	return r.db.Model(&domain.WorkspaceMember{}).
+		Where("workspace_id = ? AND user_id = ?", workspaceID, userID).
+		Update("role", role).Error
+}
+
+func (r *workspaceGormRepository) RemoveMember(workspaceID, userID string) error {
+	return r.db.Where("workspace_id = ? AND user_id = ?", workspaceID, userID).
+		Delete(&domain.WorkspaceMember{}).Error
 }

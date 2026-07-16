@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { toast } from '@/store/useToastStore';
 import {
   Dialog,
   DialogContent,
@@ -23,17 +24,29 @@ export default function JoinWorkspaceModal({ open, onOpenChange }: JoinWorkspace
   const queryClient = useQueryClient();
 
   const joinWsMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await api.post(`/workspaces/${id}/join`);
+    mutationFn: async (idOrCode: string) => {
+      const cleaned = idOrCode.trim();
+      // If code looks like an invite code (8 chars and alphanumeric without hyphen)
+      if (cleaned.length === 8 && !cleaned.includes('-')) {
+        const res = await api.post('/workspaces/join', { invite_code: cleaned });
+        return res.data;
+      }
+      // Fallback to direct ID join
+      const res = await api.post(`/workspaces/${cleaned}/join`);
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       setInviteId('');
       onOpenChange(false);
+      if (data && data.name) {
+        toast.success(`Đã tham gia Không gian làm việc "${data.name}" thành công!`);
+      } else {
+        toast.success('Đã tham gia Không gian làm việc thành công!');
+      }
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error || 'Failed to join workspace');
+      toast.error(err.response?.data?.error || 'Không thể tham gia Không gian làm việc');
     },
   });
 
@@ -49,17 +62,17 @@ export default function JoinWorkspaceModal({ open, onOpenChange }: JoinWorkspace
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Gia nhập Không gian mới</DialogTitle>
           <DialogDescription className="text-zinc-400">
-            Nhập mã ID của không gian bạn được chia sẻ để tham gia vào phòng trò chuyện.
+            Nhập Mã mời (Invite Code) hoặc ID Không gian bạn được chia sẻ để tham gia vào phòng trò chuyện.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="ws-id" className="text-zinc-300">ID Không gian</Label>
+            <Label htmlFor="ws-id" className="text-zinc-300">Mã mời hoặc ID Không gian</Label>
             <Input
               id="ws-id"
               value={inviteId}
               onChange={(e) => setInviteId(e.target.value)}
-              placeholder="Nhập ID của Không gian làm việc"
+              placeholder="Nhập Mã mời (ví dụ: ABC123XY) hoặc ID"
               className="bg-zinc-950 border-zinc-800 text-white focus-visible:ring-indigo-500 font-mono text-sm"
               disabled={joinWsMutation.isPending}
             />
