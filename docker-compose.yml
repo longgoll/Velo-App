@@ -42,7 +42,7 @@ services:
     restart: unless-stopped
     ports:
       - "9333:9333"   # Master port
-      - "8080:8080"   # Volume port
+      - "8083:8080"   # Volume port
       - "8333:8333"   # S3 API port
     command: "server -dir=/data -s3 -s3.port=8333"
     volumes:

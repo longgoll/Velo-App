@@ -27,7 +27,11 @@ func LoadConfig() *Config {
 	// Load .env file from root of project or current dir
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("No .env file found, using system environment variables")
+		// Try loading from root folder (two levels up)
+		err = godotenv.Load("../../.env")
+		if err != nil {
+			log.Println("No .env file found, using system environment variables")
+		}
 	}
 
 	return &Config{
@@ -42,7 +46,7 @@ func LoadConfig() *Config {
 		ValkeyHost:         getEnv("VALKEY_HOST", "localhost"),
 		ValkeyPort:         getEnv("VALKEY_PORT", "6379"),
 		NatsURL:            getEnv("NATS_URL", "nats://localhost:4222"),
-		PasetoSymmetricKey: getEnv("PASETO_SYMMETRIC_KEY", "yellow-submarine-yellow-submarine"),
+		PasetoSymmetricKey: getEnv("PASETO_SYMMETRIC_KEY", "yellow-submarine-yellow-submarin"),
 		GrpcPort:           getEnv("GRPC_PORT", "50051"),
 	}
 }
