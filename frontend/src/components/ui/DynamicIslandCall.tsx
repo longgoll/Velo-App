@@ -7,6 +7,7 @@ import { Mic, MicOff, Volume2, VolumeX, PhoneOff, ArrowUpRight } from 'lucide-re
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getAvatarGradient } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import api from '@/lib/api';
 
 export default function DynamicIslandCall() {
   const {
@@ -31,11 +32,19 @@ export default function DynamicIslandCall() {
   // Fetch workspaces & channels to find active voice channel name
   const { data: workspaces = [] } = useQuery<Workspace[]>({
     queryKey: ['workspaces'],
+    queryFn: async () => {
+      const res = await api.get('/workspaces');
+      return res.data;
+    },
     enabled: !!activeWorkspaceId,
   });
 
   const { data: channels = [] } = useQuery<Channel[]>({
     queryKey: ['channels', activeWorkspaceId],
+    queryFn: async () => {
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/channels`);
+      return res.data;
+    },
     enabled: !!activeWorkspaceId,
   });
 

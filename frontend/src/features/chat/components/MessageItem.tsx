@@ -4,6 +4,7 @@ import { CornerUpLeft, FileIcon, ArrowDownToLine, Loader2, MessageSquare, PhoneC
 import { getAvatarGradient } from '@/lib/utils';
 import { useChatStore } from '@/store/useChatStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
 
 interface ExtendedChatMessage extends ChatMessage {
   parentId?: string;
@@ -36,10 +37,22 @@ export default function MessageItem({
   const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
 
+  const isCallMessage = !!msg.content.match(/^\[call:(voice|video):active\]/);
+
   // Reactively subscribe to active call participants query cache
   const { data: callParticipants = [] } = useQuery<any[]>({
     queryKey: ['call-participants', msg.channel_id],
-    enabled: !!msg.channel_id,
+    queryFn: async () => {
+      const activeWorkspaceId = useChatStore.getState().activeWorkspaceId;
+      if (!msg.channel_id || !activeWorkspaceId) return [];
+      try {
+        const res = await api.get(`/workspaces/${activeWorkspaceId}/channels/${msg.channel_id}/participants`);
+        return res.data;
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: isCallMessage && !!msg.channel_id,
     staleTime: 3000,
   });
 

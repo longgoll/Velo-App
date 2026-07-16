@@ -68,6 +68,10 @@ export default function WorkspaceSettingsModal({
   // 1. Fetch workspaces from cache to find the active workspace details
   const { data: workspaces = [] } = useQuery<Workspace[]>({
     queryKey: ['workspaces'],
+    queryFn: async () => {
+      const res = await api.get('/workspaces');
+      return res.data;
+    },
     enabled: !!workspaceId,
   });
 

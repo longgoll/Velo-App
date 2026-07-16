@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Channel } from '@/types';
 import { Search, Hash, Volume2, ShieldAlert, Sparkles } from 'lucide-react';
 import { toast } from '@/store/useToastStore';
+import api from '@/lib/api';
 
 export default function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
@@ -33,6 +34,10 @@ export default function CommandPalette() {
   // Fetch channels for fuzzy search
   const { data: channels = [] } = useQuery<Channel[]>({
     queryKey: ['channels', activeWorkspaceId],
+    queryFn: async () => {
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/channels`);
+      return res.data;
+    },
     enabled: !!activeWorkspaceId && isOpen,
   });
 

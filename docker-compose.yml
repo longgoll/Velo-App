@@ -68,7 +68,7 @@ services:
       - "7880:7880"        # HTTP API & WebSockets
       - "7881:7881"        # TCP RTC
       - "7882:7882/udp"    # UDP RTC (WebRTC)
-    command: ["--dev", "--keys", "devkey: secret"] # Chế độ phát triển, sinh token bằng key/secret này
+    command: ["--dev", "--keys", "devkey: secret", "--node-ip", "127.0.0.1"] # Chế độ phát triển, sinh token bằng key/secret này và dùng IP localhost để client WebRTC kết nối được
     environment:
       LIVEKIT_KEYS: "devkey: secret"
 

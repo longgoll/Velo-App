@@ -93,6 +93,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
   });
 
   const activeDmChannel = dmChannels.find((d) => d.id === activeChannelId);
+  const isVoiceOrDm = !!activeDmChannel || (!!activeChannel && activeChannel.type === 'voice');
 
   // Fetch active call participants for the current channel to show status banner
   const { data: callParticipants = [] } = useQuery<any[]>({
@@ -106,7 +107,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
         return [];
       }
     },
-    enabled: !!activeChannelId && !!activeWorkspaceId,
+    enabled: !!activeChannelId && !!activeWorkspaceId && isVoiceOrDm,
     refetchInterval: 3000, // Poll every 3 seconds to keep call banner and indicators snappy
   });
 
