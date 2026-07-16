@@ -15,26 +15,35 @@ export const useWebSocket = (token: string | null) => {
   const socketRef = useRef<WebSocket | null>(null);
   const queryClient = useQueryClient();
   const { activeChannelId } = useChatStore();
+  const activeChannelIdRef = useRef(activeChannelId);
+
+  // Keep ref updated
+  useEffect(() => {
+    activeChannelIdRef.current = activeChannelId;
+  }, [activeChannelId]);
 
   const connect = useCallback(() => {
     if (!token) return;
 
     const wsUrl = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8081'}/ws?token=${token}`;
     const ws = new WebSocket(wsUrl);
+    socketRef.current = ws;
 
     ws.onopen = () => {
+      if (socketRef.current !== ws) return;
       console.log('WebSocket connected successfully');
       
       // Nếu đang ở channel nào thì subscribe channel đó ngay
-      if (activeChannelId) {
+      if (activeChannelIdRef.current) {
         ws.send(JSON.stringify({
           type: 'subscribe',
-          payload: { channel_id: activeChannelId }
+          payload: { channel_id: activeChannelIdRef.current }
         }));
       }
     };
 
     ws.onmessage = (event) => {
+      if (socketRef.current !== ws) return;
       try {
         const data = JSON.parse(event.data);
         console.log('WS message received:', data);
@@ -56,26 +65,32 @@ export const useWebSocket = (token: string | null) => {
     };
 
     ws.onclose = () => {
+      if (socketRef.current !== ws) return;
       console.log('WebSocket connection closed, reconnecting in 3s...');
-      setTimeout(() => connect(), 3000);
+      setTimeout(() => {
+        if (socketRef.current === ws) {
+          connect();
+        }
+      }, 3000);
     };
 
     ws.onerror = (err) => {
+      if (socketRef.current !== ws) return;
       console.error('WebSocket error:', err);
     };
-
-    socketRef.current = ws;
-  }, [token, activeChannelId, queryClient]);
+  }, [token, queryClient]);
 
   // Connect khi token thay đổi
   useEffect(() => {
     connect();
     return () => {
       if (socketRef.current) {
-        socketRef.current.close();
+        const ws = socketRef.current;
+        socketRef.current = null;
+        ws.close();
       }
     };
-  }, [connect]);
+  }, [token, connect]);
 
   // Subscribe vào channel mới khi channel thay đổi
   useEffect(() => {

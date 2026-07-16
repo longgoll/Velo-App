@@ -34,6 +34,10 @@ export default function ContentExplorer({ onCreateChanClick }: ContentExplorerPr
   // Fetch workspaces (cached) to find active workspace name
   const { data: workspaces = [] } = useQuery<Workspace[]>({
     queryKey: ['workspaces'],
+    queryFn: async () => {
+      const res = await api.get('/workspaces');
+      return res.data;
+    },
     enabled: !!activeWorkspaceId,
   });
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
+import api from '@/lib/api';
 import { Hash, PhoneCall, Video, MessageSquare } from 'lucide-react';
 import type { Channel, ChatMessage } from '@/types';
 import MessageItem from './MessageItem';
@@ -18,6 +19,10 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
   // Fetch channels list to find active channel name
   const { data: channels = [] } = useQuery<Channel[]>({
     queryKey: ['channels', activeWorkspaceId],
+    queryFn: async () => {
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/channels`);
+      return res.data;
+    },
     enabled: !!activeWorkspaceId,
   });
 
