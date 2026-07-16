@@ -23,5 +23,5 @@ export interface ChatMessage {
   user_id: string;
   username: string;
   content: string;
-  timestamp: number;
+  timestamp: string | number;
 }

@@ -21,6 +21,8 @@ type Config struct {
 	NatsURL            string
 	PasetoSymmetricKey string
 	GrpcPort           string
+	ScyllaHosts        string
+	ScyllaKeyspace     string
 }
 
 func LoadConfig() *Config {
@@ -48,6 +50,8 @@ func LoadConfig() *Config {
 		NatsURL:            getEnv("NATS_URL", "nats://localhost:4222"),
 		PasetoSymmetricKey: getEnv("PASETO_SYMMETRIC_KEY", "yellow-submarine-yellow-submarin"),
 		GrpcPort:           getEnv("GRPC_PORT", "50051"),
+		ScyllaHosts:        getEnv("SCYLLA_HOSTS", "localhost:9042"),
+		ScyllaKeyspace:     getEnv("SCYLLA_KEYSPACE", "chat_messages"),
 	}
 }
 

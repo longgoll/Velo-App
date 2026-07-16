@@ -17,6 +17,7 @@ export default function ContentExplorer({ onCreateChanClick }: ContentExplorerPr
     explorerOpen,
     setActiveChannelId,
     toggleExplorer,
+    unreadChannels,
   } = useChatStore();
 
   // Keyboard shortcut Ctrl+B / Cmd+B to toggle explorer
@@ -99,14 +100,23 @@ export default function ContentExplorer({ onCreateChanClick }: ContentExplorerPr
                         ) : (
                           <Volume2 className="w-4 h-4 text-zinc-500" />
                         )}
-                        <span className="truncate">{chan.name}</span>
-                      </div>
-                      {chan.type === 'voice' && (
-                        <span className="flex h-2 w-2 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        <span className={`truncate ${unreadChannels[chan.id] > 0 ? 'font-bold text-white' : ''}`}>
+                          {chan.name}
                         </span>
-                      )}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {unreadChannels[chan.id] > 0 && (
+                          <span className="flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full animate-pulse">
+                            {unreadChannels[chan.id]}
+                          </span>
+                        )}
+                        {chan.type === 'voice' && (
+                          <span className="flex h-2 w-2 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
+                        )}
+                      </div>
                     </button>
                   ))}
 

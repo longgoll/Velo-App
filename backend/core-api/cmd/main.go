@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -10,11 +11,14 @@ import (
 	"github.com/hoanglong/chat/backend/core-api/config"
 	httpDelivery "github.com/hoanglong/chat/backend/core-api/internal/delivery/http"
 	"github.com/hoanglong/chat/backend/core-api/internal/repository/postgres"
+	"github.com/hoanglong/chat/backend/core-api/internal/repository/scylla"
 	"github.com/hoanglong/chat/backend/core-api/internal/usecase"
 	"github.com/hoanglong/chat/backend/core-api/pkg/token"
+	"github.com/redis/go-redis/v9"
 
 	// gRPC imports
 	grpcDelivery "github.com/hoanglong/chat/backend/core-api/internal/delivery/grpc"
+	"github.com/hoanglong/chat/backend/core-api/internal/delivery/worker"
 	pbAuth "github.com/hoanglong/chat/backend/core-api/pkg/pb/auth"
 	pbGateway "github.com/hoanglong/chat/backend/core-api/pkg/pb/gateway"
 	"google.golang.org/grpc"
@@ -27,6 +31,16 @@ func main() {
 	// 2. Initialize database
 	db := postgres.InitDB(cfg)
 
+	// 2.5. Initialize ScyllaDB
+	scyllaSession := scylla.InitScyllaDB(cfg)
+	defer scyllaSession.Close()
+
+	// 2.6. Initialize Redis/Valkey client
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: fmt.Sprintf("%s:%s", cfg.ValkeyHost, cfg.ValkeyPort),
+	})
+	defer redisClient.Close()
+
 	// 3. Initialize Token Maker (PASETO)
 	tokenMaker, err := token.NewPasetoMaker(cfg.PasetoSymmetricKey)
 	if err != nil {
@@ -37,11 +51,17 @@ func main() {
 	userRepo := postgres.NewUserRepository(db)
 	workspaceRepo := postgres.NewWorkspaceRepository(db)
 	channelRepo := postgres.NewChannelRepository(db)
+	messageRepo := scylla.NewMessageRepository(scyllaSession)
 
 	// 5. Initialize UseCases
 	userUseCase := usecase.NewUserUseCase(userRepo, tokenMaker)
 	workspaceUseCase := usecase.NewWorkspaceUseCase(workspaceRepo)
 	channelUseCase := usecase.NewChannelUseCase(channelRepo, workspaceRepo)
+	messageUseCase := usecase.NewMessageUseCase(messageRepo, channelRepo, workspaceRepo)
+
+	// 5.5. Start Background Message Worker
+	msgWorker := worker.NewMessageWorker(redisClient, messageRepo)
+	msgWorker.Start(context.Background())
 
 	// 6. Start gRPC Server in background
 	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GrpcPort))
@@ -83,6 +103,7 @@ func main() {
 	httpDelivery.NewUserHandler(api, userUseCase)
 	httpDelivery.NewWorkspaceHandler(api, authMiddleware, workspaceUseCase)
 	httpDelivery.NewChannelHandler(api, authMiddleware, channelUseCase)
+	httpDelivery.NewMessageHandler(api, authMiddleware, messageUseCase)
 
 	// Health Check
 	app.Get("/health", func(c *fiber.Ctx) error {

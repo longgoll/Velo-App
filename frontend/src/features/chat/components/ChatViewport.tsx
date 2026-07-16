@@ -28,13 +28,14 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
 
   const activeChannel = channels.find((c) => c.id === activeChannelId);
 
-  // Fetch messages from TanStack cache
+  // Fetch messages from ScyllaDB history via Core API
   const { data: messages = [] } = useQuery<ChatMessage[]>({
     queryKey: ['messages', activeChannelId],
     queryFn: async () => {
-      // Fallback/Placeholder: initially returns empty array.
-      // Real-time messages will be populated by WebSocket hook into this queryKey.
-      return [];
+      const res = await api.get(`/channels/${activeChannelId}/messages?limit=50`);
+      const msgs = res.data as ChatMessage[];
+      // Đảo ngược danh sách tin nhắn để hiển thị theo đúng thứ tự thời gian (cũ ở trên, mới ở dưới)
+      return [...msgs].reverse();
     },
     enabled: !!activeChannelId,
   });

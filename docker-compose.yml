@@ -48,6 +48,17 @@ services:
     volumes:
       - seaweedfs_data:/data
 
+  # 4.5. ScyllaDB (Cơ sở dữ liệu NoSQL lưu tin nhắn)
+  scylla:
+    image: scylladb/scylla:5.4.0
+    container_name: chat-scylla
+    restart: unless-stopped
+    ports:
+      - "9042:9042"
+    command: --smp 1 --memory 512M --overprovisioned 1 --developer-mode 1
+    volumes:
+      - scylla_data:/var/lib/scylla
+
   # 5. LiveKit (WebRTC SFU Media Server - Tạm thời comment, sẽ mở ở Phase 6)
   # livekit:
   #   image: livekit/livekit-server:latest
@@ -83,3 +94,4 @@ volumes:
   postgres_data:
   valkey_data:
   seaweedfs_data:
+  scylla_data:

@@ -8,7 +8,7 @@ interface ChatMessage {
   user_id: string;
   username: string;
   content: string;
-  timestamp: number;
+  timestamp: string | number;
 }
 
 export const useWebSocket = (token: string | null) => {
@@ -58,6 +58,22 @@ export const useWebSocket = (token: string | null) => {
             if (oldMessages.some(m => m.id === chatMsg.id)) return oldMessages;
             return [...oldMessages, chatMsg];
           });
+
+          // Xử lý thông báo khi nhận tin ở kênh không hoạt động
+          if (chatMsg.channel_id !== activeChannelIdRef.current) {
+            useChatStore.getState().incrementUnread(chatMsg.channel_id);
+
+            // Bắn Native Browser Notification nếu tab đang ẩn và có quyền
+            if (
+              'Notification' in window &&
+              Notification.permission === 'granted' &&
+              document.visibilityState === 'hidden'
+            ) {
+              new Notification(`#${chatMsg.username}`, {
+                body: chatMsg.content,
+              });
+            }
+          }
         }
       } catch (err) {
         console.error('Failed to parse WebSocket message:', err);
@@ -111,6 +127,13 @@ export const useWebSocket = (token: string | null) => {
       }));
     } else {
       console.error('WebSocket is not connected');
+    }
+  }, []);
+
+  // Yêu cầu quyền thông báo từ trình duyệt khi khởi chạy
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
     }
   }, []);
 
