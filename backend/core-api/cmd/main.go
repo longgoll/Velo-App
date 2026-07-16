@@ -56,7 +56,7 @@ func main() {
 	// 5. Initialize UseCases
 	userUseCase := usecase.NewUserUseCase(userRepo, tokenMaker)
 	workspaceUseCase := usecase.NewWorkspaceUseCase(workspaceRepo)
-	channelUseCase := usecase.NewChannelUseCase(channelRepo, workspaceRepo)
+	channelUseCase := usecase.NewChannelUseCase(channelRepo, workspaceRepo, cfg.LiveKitURL, cfg.LiveKitApiKey, cfg.LiveKitApiSecret)
 	messageUseCase := usecase.NewMessageUseCase(messageRepo, channelRepo, workspaceRepo)
 
 	// 5.5. Start Background Message Worker

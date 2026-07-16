@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useChatStore } from '@/store/useChatStore';
+import { useVoiceCall } from '@/context/VoiceCallContext';
 import { useQuery } from '@tanstack/react-query';
 import type { Channel, Workspace } from '@/types';
 import { Mic, MicOff, Volume2, VolumeX, PhoneOff, ArrowUpRight } from 'lucide-react';
@@ -13,11 +14,17 @@ export default function DynamicIslandCall() {
     activeVoiceChannelId,
     voiceMuted,
     voiceDeafened,
-    setActiveVoiceChannelId,
     setActiveChannelId,
     setVoiceMuted,
     setVoiceDeafened,
   } = useChatStore();
+
+  const {
+    participants,
+    isConnected,
+    isConnecting,
+    disconnectCall,
+  } = useVoiceCall();
 
   const [isHovered, setIsHovered] = useState(false);
 
@@ -39,7 +46,7 @@ export default function DynamicIslandCall() {
 
   const handleDisconnect = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setActiveVoiceChannelId(null);
+    disconnectCall();
   };
 
   const handleReturnToRoom = () => {
@@ -69,15 +76,17 @@ export default function DynamicIslandCall() {
 
         {/* Waveform / Connection Indicator */}
         <div className="flex items-end gap-[2px] h-[16px] shrink-0 w-[14px]">
-          <div className="w-[2px] bg-emerald-400 rounded-full wave-1" />
-          <div className="w-[2px] bg-emerald-400 rounded-full wave-2" />
-          <div className="w-[2px] bg-emerald-400 rounded-full wave-3" />
-          <div className="w-[2px] bg-emerald-400 rounded-full wave-4" />
+          <div className={`w-[2px] bg-emerald-400 rounded-full ${isConnected && !voiceMuted ? 'wave-1' : 'h-[4px]'}`} />
+          <div className={`w-[2px] bg-emerald-400 rounded-full ${isConnected && !voiceMuted ? 'wave-2' : 'h-[4px]'}`} />
+          <div className={`w-[2px] bg-emerald-400 rounded-full ${isConnected && !voiceMuted ? 'wave-3' : 'h-[4px]'}`} />
+          <div className={`w-[2px] bg-emerald-400 rounded-full ${isConnected && !voiceMuted ? 'wave-4' : 'h-[4px]'}`} />
         </div>
 
         {/* Center: Title / Channel info */}
         <div className="flex-1 min-w-0 text-left">
-          <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest leading-none">Voice Connected</div>
+          <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest leading-none">
+            {isConnecting ? 'Connecting...' : 'Voice Connected'}
+          </div>
           <div className="text-xs font-bold text-white truncate mt-1">
             {voiceChan?.name || 'Phòng thoại'}
           </div>
@@ -91,14 +100,23 @@ export default function DynamicIslandCall() {
         {/* Hover participants state */}
         {isHovered ? (
           <div className="flex items-center gap-3 shrink-0 animate-in fade-in zoom-in duration-200">
-            {/* Mock call participants */}
+            {/* Real call participants */}
             <div className="flex -space-x-1.5 overflow-hidden">
-               <Avatar size="sm" className="w-5 h-5">
-                <AvatarFallback className={`text-[8px] font-bold ${getAvatarGradient('Hoàng Long')}`}>HL</AvatarFallback>
-              </Avatar>
-              <Avatar size="sm" className="w-5 h-5">
-                <AvatarFallback className={`text-[8px] font-bold ${getAvatarGradient('AI Assistant')}`}>AI</AvatarFallback>
-              </Avatar>
+              {participants.slice(0, 3).map((p) => {
+                const initials = p.name ? p.name.substring(0, 2).toUpperCase() : 'U';
+                return (
+                  <Avatar key={p.identity} size="sm" className="w-5 h-5 border border-zinc-950">
+                    <AvatarFallback className={`text-[7px] font-bold ${getAvatarGradient(p.name || '')}`}>
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                );
+              })}
+              {participants.length > 3 && (
+                <div className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-950 flex items-center justify-center text-[7px] font-bold text-zinc-400 shrink-0">
+                  +{participants.length - 3}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-1">

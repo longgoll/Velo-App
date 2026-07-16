@@ -8,6 +8,8 @@ import MessageItem from './MessageItem';
 import ThreadSidebar from './ThreadSidebar';
 import ChatInput from './ChatInput';
 import DynamicIslandCall from '../../../components/ui/DynamicIslandCall';
+import VoiceRoomView from './VoiceRoomView';
+import { useVoiceCall } from '@/context/VoiceCallContext';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import AllMessagesDashboard from './AllMessagesDashboard';
 
@@ -26,8 +28,21 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     setShowJoinWs,
     setShowCreateChan,
     unreadChannels,
-    activeFilter
+    activeFilter,
+    voiceMuted,
+    voiceDeafened,
+    setVoiceMuted,
+    setVoiceDeafened
   } = useChatStore();
+
+  const {
+    participants,
+    isConnected,
+    isConnecting,
+    toggleCamera,
+    toggleScreenShare,
+    disconnectCall
+  } = useVoiceCall();
 
   const parentRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -79,6 +94,22 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
 
   const activeDmChannel = dmChannels.find((d) => d.id === activeChannelId);
 
+  // Fetch active call participants for the current channel to show status banner
+  const { data: callParticipants = [] } = useQuery<any[]>({
+    queryKey: ['call-participants', activeChannelId],
+    queryFn: async () => {
+      if (!activeChannelId || !activeWorkspaceId) return [];
+      try {
+        const res = await api.get(`/workspaces/${activeWorkspaceId}/channels/${activeChannelId}/participants`);
+        return res.data;
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: !!activeChannelId && !!activeWorkspaceId,
+    refetchInterval: 3000, // Poll every 3 seconds to keep call banner and indicators snappy
+  });
+
   // Fetch messages from ScyllaDB history via Core API
   const { data: messages = [] } = useQuery<ChatMessage[]>({
     queryKey: ['messages', activeChannelId],
@@ -95,6 +126,18 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
   // Intercept sending messages to handle reply prefixes
   const handleSendMessage = (channelId: string, content: string) => {
     onSendMessage(channelId, content);
+  };
+
+  const handleStartVoiceCall = () => {
+    if (!activeChannelId) return;
+    useChatStore.getState().setActiveVoiceChannelId(activeChannelId);
+    handleSendMessage(activeChannelId, '[call:voice:active]');
+  };
+
+  const handleStartVideoCall = () => {
+    if (!activeChannelId) return;
+    useChatStore.getState().setActiveVoiceChannelId(activeChannelId);
+    handleSendMessage(activeChannelId, '[call:video:active]');
   };
 
   // Send a threaded reply message
@@ -380,6 +423,26 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     return <AllMessagesDashboard onSendMessage={handleSendMessage} />;
   }
 
+  if (activeChannel && activeChannel.type === 'voice') {
+    return (
+      <div className="flex-1 bg-zinc-950 flex flex-row h-full min-w-0 relative animate-in fade-in duration-200">
+        <VoiceRoomView
+          channelName={activeChannel.name}
+          participants={participants}
+          isConnected={isConnected}
+          isConnecting={isConnecting}
+          voiceMuted={voiceMuted}
+          voiceDeafened={voiceDeafened}
+          onToggleMic={() => setVoiceMuted(!voiceMuted)}
+          onToggleCamera={toggleCamera}
+          onToggleScreenShare={toggleScreenShare}
+          onDisconnect={disconnectCall}
+          onToggleDeafen={() => setVoiceDeafened(!voiceDeafened)}
+        />
+      </div>
+    );
+  }
+
   if (!activeChannelId) {
     const hasWorkspaces = workspaces.length > 0;
     
@@ -489,8 +552,8 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
           </div>
         )}
 
-        {/* 2. Dynamic Island Persistent Voice widget */}
-        {activeVoiceChannelId && activeVoiceChannelId !== activeChannelId && (
+        {/* 2. Dynamic Island Persistent Voice widget (only shown when Sidebar is hidden) */}
+        {activeVoiceChannelId && !explorerOpen && (activeVoiceChannelId !== activeChannelId || activeChannel?.type !== 'voice') && (
           <DynamicIslandCall />
         )}
 
@@ -508,10 +571,18 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer">
+            <button
+              onClick={handleStartVoiceCall}
+              className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer"
+              title="Bắt đầu cuộc gọi thoại"
+            >
               <PhoneCall className="w-4 h-4" />
             </button>
-            <button className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer">
+            <button
+              onClick={handleStartVideoCall}
+              className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer"
+              title="Bắt đầu cuộc gọi video"
+            >
               <Video className="w-4 h-4" />
             </button>
             <button
@@ -523,6 +594,31 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
             </button>
           </div>
         </div>
+
+        {/* 3. Active call indicator banner (for Text & DM channels) */}
+        {callParticipants.length > 0 && activeVoiceChannelId !== activeChannelId && (
+          <div className="mx-6 mt-3 px-4 py-3 bg-emerald-950/20 border border-emerald-500/20 rounded-2xl flex items-center justify-between backdrop-blur-md shadow-md animate-in slide-in-from-top duration-200 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 animate-pulse">
+                <PhoneCall className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-bold text-white">Cuộc gọi thoại đang diễn ra</div>
+                <div className="text-[10px] text-emerald-400 mt-0.5 font-medium">
+                  Đang trong cuộc gọi: {callParticipants.map((p: any) => p.name || p.identity).join(', ')}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                useChatStore.getState().setActiveVoiceChannelId(activeChannelId);
+              }}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition duration-150 cursor-pointer border-0 active:scale-95 shadow-md shadow-emerald-600/15"
+            >
+              Tham gia
+            </button>
+          </div>
+        )}
 
         {/* Virtualized Message List */}
         <div 

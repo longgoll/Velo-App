@@ -16,6 +16,8 @@ func NewChannelHandler(router fiber.Router, authMiddleware fiber.Handler, channe
 	channelGroup := router.Group("/workspaces/:workspace_id/channels", authMiddleware)
 	channelGroup.Post("/", handler.Create)
 	channelGroup.Get("/", handler.List)
+	channelGroup.Post("/:channel_id/token", handler.GetCallToken)
+	channelGroup.Get("/:channel_id/participants", handler.GetCallParticipants)
 }
 
 func (h *ChannelHandler) Create(c *fiber.Ctx) error {
@@ -51,4 +53,37 @@ func (h *ChannelHandler) List(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(res)
+}
+
+func (h *ChannelHandler) GetCallToken(c *fiber.Ctx) error {
+	payload := c.Locals(authorizationPayloadKey).(*token.Payload)
+	workspaceID := c.Params("workspace_id")
+	channelID := c.Params("channel_id")
+
+	token, url, err := h.channelUseCase.GenerateCallToken(payload.UserID, payload.Username, workspaceID, channelID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"token": token,
+		"url":   url,
+	})
+}
+
+func (h *ChannelHandler) GetCallParticipants(c *fiber.Ctx) error {
+	payload := c.Locals(authorizationPayloadKey).(*token.Payload)
+	workspaceID := c.Params("workspace_id")
+	channelID := c.Params("channel_id")
+
+	participants, err := h.channelUseCase.GetCallParticipants(payload.UserID, workspaceID, channelID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(participants)
 }

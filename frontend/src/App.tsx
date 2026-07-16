@@ -15,6 +15,7 @@ import api from '@/lib/api';
 import Toaster from '@/components/ui/Toaster';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { toast } from '@/store/useToastStore';
+import { VoiceCallProvider } from '@/context/VoiceCallContext';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
@@ -90,30 +91,32 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-zinc-200 select-none overflow-hidden">
-      {/* 1. Slim Left Navigation Sidebar */}
-      <WorkspaceSidebar
-        user={user}
-        onLogout={handleLogout}
-      />
+    <VoiceCallProvider>
+      <div className="flex h-screen bg-zinc-950 text-zinc-200 select-none overflow-hidden">
+        {/* 1. Slim Left Navigation Sidebar */}
+        <WorkspaceSidebar
+          user={user}
+          onLogout={handleLogout}
+        />
 
-      {/* 2. Fluid Content Explorer Sidebar */}
-      <ContentExplorer />
+        {/* 2. Fluid Content Explorer Sidebar */}
+        <ContentExplorer />
 
-      {/* 3. Main Chat Viewport */}
-      <ChatViewport onSendMessage={sendMessage} />
+        {/* 3. Main Chat Viewport */}
+        <ChatViewport onSendMessage={sendMessage} />
 
-      {/* --- Dialog / Modals --- */}
-      <CreateWorkspaceModal open={showCreateWs} onOpenChange={setShowCreateWs} />
-      <JoinWorkspaceModal open={showJoinWs} onOpenChange={setShowJoinWs} />
-      <CreateChannelModal open={showCreateChan} onOpenChange={setShowCreateChan} />
-      
-      {/* Omni-Command Palette */}
-      <CommandPalette />
+        {/* --- Dialog / Modals --- */}
+        <CreateWorkspaceModal open={showCreateWs} onOpenChange={setShowCreateWs} />
+        <JoinWorkspaceModal open={showJoinWs} onOpenChange={setShowJoinWs} />
+        <CreateChannelModal open={showCreateChan} onOpenChange={setShowCreateChan} />
+        
+        {/* Omni-Command Palette */}
+        <CommandPalette />
 
-      {/* Global notifications and confirmation dialogs */}
-      <Toaster />
-      <ConfirmDialog />
-    </div>
+        {/* Global notifications and confirmation dialogs */}
+        <Toaster />
+        <ConfirmDialog />
+      </div>
+    </VoiceCallProvider>
   );
 }

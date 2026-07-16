@@ -59,18 +59,18 @@ services:
     volumes:
       - scylla_data:/var/lib/scylla
 
-  # 5. LiveKit (WebRTC SFU Media Server - Tạm thời comment, sẽ mở ở Phase 6)
-  # livekit:
-  #   image: livekit/livekit-server:latest
-  #   container_name: chat-livekit
-  #   restart: unless-stopped
-  #   ports:
-  #     - "7880:7880"        # HTTP API & WebSockets
-  #     - "7881:7881"        # TCP RTC
-  #     - "7882:7882/udp"    # UDP RTC (WebRTC)
-  #   command: --dev --keys "devkey: secret" # Chế độ phát triển, sinh token bằng key/secret này
-  #   environment:
-  #     - LIVEKIT_KEYS=devkey: secret
+  # 5. LiveKit (WebRTC SFU Media Server)
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: chat-livekit
+    restart: unless-stopped
+    ports:
+      - "7880:7880"        # HTTP API & WebSockets
+      - "7881:7881"        # TCP RTC
+      - "7882:7882/udp"    # UDP RTC (WebRTC)
+    command: ["--dev", "--keys", "devkey: secret"] # Chế độ phát triển, sinh token bằng key/secret này
+    environment:
+      LIVEKIT_KEYS: "devkey: secret"
 
   # 6. Coturn (STUN/TURN Server - Tạm thời comment, sẽ mở ở Phase 6 khi deploy/test mạng ngoài)
   # coturn:

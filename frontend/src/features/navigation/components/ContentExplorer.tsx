@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
-import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe, Bell, Settings } from 'lucide-react';
+import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe, Bell, Settings, Copy, Link, Check, Share2, PhoneCall, Mic, MicOff, Headphones, PhoneOff } from 'lucide-react';
 import api from '@/lib/api';
+import { useVoiceCall } from '@/context/VoiceCallContext';
 import type { Channel, Workspace, DMChannel, WorkspaceMember } from '@/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -15,6 +16,272 @@ const MOCK_COMMUNITIES = [
   { id: 'comm-2', name: 'Design Hub Showcase', members: '8.2k members', desc: 'Nơi chia sẻ các thiết kế UI/UX.' },
   { id: 'comm-3', name: 'Open Source Pioneers', members: '3.1k members', desc: 'Đóng góp dự án mã nguồn mở.' },
 ];
+interface VoiceChannelItemProps {
+  chan: Channel;
+  activeWorkspaceId: string | null;
+  activeChannelId: string | null;
+  activeVoiceChannelId: string | null;
+  handleChannelClick: (chan: Channel) => void;
+}
+
+function VoiceChannelItem({
+  chan,
+  activeWorkspaceId,
+  activeChannelId,
+  activeVoiceChannelId,
+  handleChannelClick,
+}: VoiceChannelItemProps) {
+  const isUserInThisVoice = activeVoiceChannelId === chan.id;
+
+  // Query active call participants from Go Core API
+  const { data: participants = [] } = useQuery<any[]>({
+    queryKey: ['call-participants', chan.id],
+    queryFn: async () => {
+      if (!chan.id || !activeWorkspaceId) return [];
+      try {
+        const res = await api.get(`/workspaces/${activeWorkspaceId}/channels/${chan.id}/participants`);
+        return res.data;
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: !!chan.id && !!activeWorkspaceId,
+    refetchInterval: 3000, // Poll every 3 seconds to keep sidebar participants in sync
+  });
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <button
+        onClick={() => handleChannelClick(chan)}
+        className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
+          activeChannelId === chan.id
+            ? 'bg-zinc-800/80 text-white'
+            : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
+        }`}
+      >
+        <div className="flex items-center gap-2 truncate">
+          <Volume2 className={`w-3.5 h-3.5 ${isUserInThisVoice || participants.length > 0 ? 'text-emerald-400 animate-pulse' : 'text-zinc-500'}`} />
+          <span className={`truncate ${isUserInThisVoice ? 'text-emerald-400 font-semibold' : ''}`}>
+            {chan.name}
+          </span>
+        </div>
+        {isUserInThisVoice ? (
+          <span className="flex h-2 w-2 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+        ) : participants.length > 0 ? (
+          <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 animate-pulse font-bold bg-emerald-950/40 border border-emerald-500/10 px-1 rounded">
+            <span className="w-1 h-1 rounded-full bg-emerald-400" />
+            {participants.length}
+          </span>
+        ) : null}
+      </button>
+
+      {/* Render active participants list under channel name */}
+      {participants.length > 0 && (
+        <div className="pl-6 pr-2 py-0.5 flex flex-col gap-1 select-none animate-in fade-in slide-in-from-top-1 duration-150">
+          {participants.map((p) => {
+            const initials = p.name ? p.name.substring(0, 2).toUpperCase() : 'U';
+            return (
+              <div key={p.identity} className="flex items-center gap-1.5 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300">
+                <Avatar className="w-4 h-4 border border-zinc-950 shrink-0">
+                  <AvatarFallback className={`text-[6px] font-extrabold ${getAvatarGradient(p.name || '')}`}>
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate max-w-[140px] font-medium leading-none">{p.name || 'Người dùng'}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface TextChannelItemProps {
+  chan: Channel;
+  activeWorkspaceId: string | null;
+  activeChannelId: string | null;
+  activeVoiceChannelId: string | null;
+  unreadChannels: Record<string, number>;
+  handleChannelClick: (chan: Channel) => void;
+}
+
+function TextChannelItem({
+  chan,
+  activeWorkspaceId,
+  activeChannelId,
+  activeVoiceChannelId,
+  unreadChannels,
+  handleChannelClick,
+}: TextChannelItemProps) {
+  const isUserInThisVoice = activeVoiceChannelId === chan.id;
+
+  // Query active call participants from Go Core API
+  const { data: participants = [] } = useQuery<any[]>({
+    queryKey: ['call-participants', chan.id],
+    queryFn: async () => {
+      if (!chan.id || !activeWorkspaceId) return [];
+      try {
+        const res = await api.get(`/workspaces/${activeWorkspaceId}/channels/${chan.id}/participants`);
+        return res.data;
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: !!chan.id && !!activeWorkspaceId,
+    refetchInterval: 3000,
+  });
+
+  return (
+    <div className="flex flex-col gap-0.5 animate-in fade-in duration-255">
+      <button
+        onClick={() => handleChannelClick(chan)}
+        className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
+          activeChannelId === chan.id
+            ? 'bg-zinc-800/80 text-white shadow-sm'
+            : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
+        }`}
+      >
+        <div className="flex items-center gap-2 truncate">
+          {participants.length > 0 ? (
+            <PhoneCall className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+          ) : (
+            <Hash className="w-3.5 h-3.5 text-zinc-500" />
+          )}
+          <span className={`truncate ${unreadChannels[chan.id] > 0 ? 'font-bold text-white' : ''} ${isUserInThisVoice ? 'text-emerald-400 font-semibold' : ''}`}>
+            {chan.name}
+          </span>
+        </div>
+        {unreadChannels[chan.id] > 0 ? (
+          <span className="flex items-center justify-center min-w-[16px] h-[16px] px-1 text-[9px] font-bold text-white bg-rose-500 rounded-full shrink-0">
+            {unreadChannels[chan.id]}
+          </span>
+        ) : participants.length > 0 ? (
+          <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 animate-pulse font-bold bg-emerald-950/40 border border-emerald-500/10 px-1 rounded shrink-0">
+            <span className="w-1 h-1 rounded-full bg-emerald-400" />
+            {participants.length}
+          </span>
+        ) : null}
+      </button>
+
+      {/* Render active participants list under text channel name if call is active */}
+      {participants.length > 0 && (
+        <div className="pl-6 pr-2 py-0.5 flex flex-col gap-1 select-none animate-in fade-in slide-in-from-top-1 duration-150">
+          {participants.map((p) => {
+            const initials = p.name ? p.name.substring(0, 2).toUpperCase() : 'U';
+            return (
+              <div key={p.identity} className="flex items-center gap-1.5 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300">
+                <Avatar className="w-4 h-4 border border-zinc-950 shrink-0">
+                  <AvatarFallback className={`text-[6px] font-extrabold ${getAvatarGradient(p.name || '')}`}>
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate max-w-[140px] font-medium leading-none">{p.name || 'Người dùng'}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface DmChannelItemProps {
+  dm: any;
+  activeWorkspaceId: string | null;
+  activeChannelId: string | null;
+  activeVoiceChannelId: string | null;
+  handleChannelClick: (id: string) => void;
+}
+
+function DmChannelItem({
+  dm,
+  activeWorkspaceId,
+  activeChannelId,
+  activeVoiceChannelId,
+  handleChannelClick,
+}: DmChannelItemProps) {
+  const isUserInThisVoice = activeVoiceChannelId === dm.id;
+  const isActive = activeChannelId === dm.id;
+
+  // Query active call participants from Go Core API
+  const { data: participants = [] } = useQuery<any[]>({
+    queryKey: ['call-participants', dm.id],
+    queryFn: async () => {
+      if (!dm.id || !activeWorkspaceId) return [];
+      try {
+        const res = await api.get(`/workspaces/${activeWorkspaceId}/channels/${dm.id}/participants`);
+        return res.data;
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: !!dm.id && !!activeWorkspaceId,
+    refetchInterval: 3000,
+  });
+
+  return (
+    <div className="flex flex-col gap-0.5 animate-in fade-in duration-255">
+      <button
+        onClick={() => handleChannelClick(dm.id)}
+        className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-xs font-medium transition outline-none ${
+          isActive
+            ? 'bg-zinc-800/80 text-white shadow-sm'
+            : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
+        }`}
+      >
+        <div className="relative shrink-0">
+          <Avatar size="sm" className={`shadow-[0_0_8px_rgba(0,0,0,0.3)] transition-all ${dm.status === 'online' ? 'ring-1 ring-emerald-500/20' : ''}`}>
+            <AvatarFallback className={`text-[10px] font-semibold ${getAvatarGradient(dm.username)}`}>
+              {dm.username.slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 ${dm.statusColor} shadow-sm`} />
+        </div>
+        <div className="truncate text-left flex-1 min-w-0">
+          <div className={`truncate font-semibold text-zinc-200 ${isUserInThisVoice ? 'text-emerald-400' : ''}`}>{dm.username}</div>
+          <div className="text-[10px] text-zinc-500 font-normal truncate mt-0.5 capitalize flex items-center gap-1">
+            {participants.length > 0 ? (
+              <span className="text-emerald-400 font-semibold animate-pulse flex items-center gap-1">
+                <PhoneCall className="w-2.5 h-2.5" /> Đang cuộc gọi
+              </span>
+            ) : (
+              dm.statusText || dm.status
+            )}
+          </div>
+        </div>
+        {participants.length > 0 && !isUserInThisVoice && (
+          <span className="flex h-2 w-2 relative shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+        )}
+      </button>
+
+      {/* Render active participants list under DM channel if call is active */}
+      {participants.length > 0 && (
+        <div className="pl-12 pr-2 py-0.5 flex flex-col gap-1 select-none animate-in fade-in slide-in-from-top-1 duration-150">
+          {participants.map((p) => {
+            const initials = p.name ? p.name.substring(0, 2).toUpperCase() : 'U';
+            return (
+              <div key={p.identity} className="flex items-center gap-1.5 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300">
+                <Avatar className="w-4 h-4 border border-zinc-950 shrink-0">
+                  <AvatarFallback className={`text-[6px] font-extrabold ${getAvatarGradient(p.name || '')}`}>
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate max-w-[120px] font-medium leading-none">{p.name || 'Người dùng'}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ContentExplorer() {
   const {
@@ -33,13 +300,45 @@ export default function ContentExplorer() {
     setShowJoinWs,
     setShowCreateChan,
     setActiveFilter,
+    voiceMuted,
+    voiceDeafened,
+    setVoiceMuted,
+    setVoiceDeafened,
   } = useChatStore();
+
+  const { disconnectCall } = useVoiceCall();
 
   const [textFolderOpen, setTextFolderOpen] = useState(true);
   const [voiceFolderOpen, setVoiceFolderOpen] = useState(true);
   const [dmSearch, setDmSearch] = useState('');
   const [wsDropdownOpen, setWsDropdownOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  const [copiedId, setCopiedId] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleCopyId = () => {
+    if (!activeWorkspaceId) return;
+    navigator.clipboard.writeText(activeWorkspaceId);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
+
+  const handleCopyLink = () => {
+    if (!activeWs?.invite_code) return;
+    const inviteLink = `${window.location.origin}?invite=${activeWs.invite_code}`;
+    navigator.clipboard.writeText(inviteLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleCopyCode = () => {
+    if (!activeWs?.invite_code) return;
+    navigator.clipboard.writeText(activeWs.invite_code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
 
   // Keyboard shortcut Ctrl+B / Cmd+B to toggle explorer
   useEffect(() => {
@@ -267,6 +566,18 @@ export default function ContentExplorer() {
   const textChannels = channels.filter((c) => c.type === 'text');
   const voiceChannels = channels.filter((c) => c.type === 'voice');
 
+  // Find name of active voice channel
+  const activeVoiceChannel = allExplorerChannels.find(c => c.id === activeVoiceChannelId);
+  let voiceChannelName = activeVoiceChannel ? activeVoiceChannel.name : 'Cuộc gọi';
+  
+  if (!activeVoiceChannel) {
+    const activeVoiceDm = allExplorerDms.find(d => d.id === activeVoiceChannelId);
+    if (activeVoiceDm) {
+      const otherUser = activeVoiceDm.user_one_id === currentUser?.id ? activeVoiceDm.user_two : activeVoiceDm.user_one;
+      voiceChannelName = otherUser?.username || 'Trò chuyện';
+    }
+  }
+
   return (
     <div className="w-[240px] bg-zinc-900/90 backdrop-blur-md flex flex-col justify-between border-r border-zinc-950/60 h-full select-none shrink-0 transition-all duration-300">
       <div className="flex flex-col flex-1 min-h-0">
@@ -388,29 +699,17 @@ export default function ContentExplorer() {
                     </div>
 
                     {textFolderOpen && (
-                      <div className="space-y-0.5 pl-3">
+                      <div className="space-y-1.5 pl-3">
                         {textChannels.map((chan) => (
-                          <button
+                          <TextChannelItem
                             key={chan.id}
-                            onClick={() => handleChannelClick(chan)}
-                            className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
-                              activeChannelId === chan.id
-                                ? 'bg-zinc-800/80 text-white shadow-sm'
-                                : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 truncate">
-                              <Hash className="w-3.5 h-3.5 text-zinc-500" />
-                              <span className={`truncate ${unreadChannels[chan.id] > 0 ? 'font-bold text-white' : ''}`}>
-                                {chan.name}
-                              </span>
-                            </div>
-                            {unreadChannels[chan.id] > 0 && (
-                              <span className="flex items-center justify-center min-w-[16px] h-[16px] px-1 text-[9px] font-bold text-white bg-rose-500 rounded-full">
-                                {unreadChannels[chan.id]}
-                              </span>
-                            )}
-                          </button>
+                            chan={chan}
+                            activeWorkspaceId={activeWorkspaceId}
+                            activeChannelId={activeChannelId}
+                            activeVoiceChannelId={activeVoiceChannelId}
+                            unreadChannels={unreadChannels}
+                            handleChannelClick={handleChannelClick}
+                          />
                         ))}
                         {textChannels.length === 0 && !isChannelsLoading && (
                           <p className="text-[11px] text-zinc-600 italic pl-5 py-1">Chưa có kênh chữ</p>
@@ -444,36 +743,17 @@ export default function ContentExplorer() {
                     </div>
 
                     {voiceFolderOpen && (
-                      <div className="space-y-0.5 pl-3">
-                        {voiceChannels.map((chan) => {
-                          const isUserInThisVoice = activeVoiceChannelId === chan.id;
-                          return (
-                            <button
-                              key={chan.id}
-                              onClick={() => handleChannelClick(chan)}
-                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
-                                activeChannelId === chan.id
-                                  ? 'bg-zinc-800/80 text-white'
-                                  : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <Volume2 className={`w-3.5 h-3.5 ${isUserInThisVoice ? 'text-emerald-400 animate-pulse' : 'text-zinc-500'}`} />
-                                <span className={`truncate ${isUserInThisVoice ? 'text-emerald-400 font-semibold' : ''}`}>
-                                  {chan.name}
-                                </span>
-                              </div>
-                              {isUserInThisVoice ? (
-                                <span className="flex h-2 w-2 relative">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                </span>
-                              ) : (
-                                <span className="text-[9px] text-zinc-600 font-mono">🔊 Trực tuyến</span>
-                              )}
-                            </button>
-                          );
-                        })}
+                      <div className="space-y-1.5 pl-3">
+                        {voiceChannels.map((chan) => (
+                          <VoiceChannelItem
+                            key={chan.id}
+                            chan={chan}
+                            activeWorkspaceId={activeWorkspaceId}
+                            activeChannelId={activeChannelId}
+                            activeVoiceChannelId={activeVoiceChannelId}
+                            handleChannelClick={handleChannelClick}
+                          />
+                        ))}
                         {voiceChannels.length === 0 && !isChannelsLoading && (
                           <p className="text-[11px] text-zinc-600 italic pl-5 py-1">Chưa có kênh thoại</p>
                         )}
@@ -546,34 +826,16 @@ export default function ContentExplorer() {
                   </>
                 ) : (
                   /* Active DMs list */
-                  activeDmsList.map((dm) => {
-                    const isActive = activeChannelId === dm.id;
-                    return (
-                      <button
-                        key={dm.id}
-                        onClick={() => setActiveChannelId(dm.id)}
-                        className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-xs font-medium transition outline-none ${
-                          isActive
-                            ? 'bg-zinc-800/80 text-white shadow-sm'
-                            : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
-                        }`}
-                      >
-                        <div className="relative">
-                          <Avatar size="sm" className={`shadow-[0_0_8px_rgba(0,0,0,0.3)] transition-all ${dm.status === 'online' ? 'ring-1 ring-emerald-500/20' : ''}`}>
-                            <AvatarFallback className={`text-[10px] font-semibold ${getAvatarGradient(dm.username)}`}>
-                              {dm.username.slice(0, 1).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {/* Glow ambient presence indicator */}
-                          <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 ${dm.statusColor} shadow-sm`} />
-                        </div>
-                        <div className="truncate text-left flex-1">
-                          <div className="truncate font-semibold text-zinc-200">{dm.username}</div>
-                          <div className="text-[10px] text-zinc-500 font-normal truncate mt-0.5 capitalize">{dm.status}</div>
-                        </div>
-                      </button>
-                    );
-                  })
+                  activeDmsList.map((dm) => (
+                    <DmChannelItem
+                      key={dm.id}
+                      dm={dm}
+                      activeWorkspaceId={activeWorkspaceId}
+                      activeChannelId={activeChannelId}
+                      activeVoiceChannelId={activeVoiceChannelId}
+                      handleChannelClick={(id) => setActiveChannelId(id, 'dm', activeWorkspaceId)}
+                    />
+                  ))
                 )}
               </div>
             </ScrollArea>
@@ -742,13 +1004,91 @@ export default function ContentExplorer() {
 
       </div>
 
+      {/* Discord-like Voice Connection State Panel */}
+      {activeVoiceChannelId && (
+        <div className="px-3 py-2 bg-zinc-950/80 border-t border-zinc-900/60 flex items-center justify-between shadow-[0_-4px_12px_rgba(0,0,0,0.2)] select-none">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0 border border-emerald-500/10">
+              <Volume2 className="w-4 h-4 animate-pulse" />
+            </div>
+            <div className="text-left flex-1 min-w-0">
+              <div className="text-[10px] font-bold text-emerald-400 leading-tight">Đã kết nối thoại</div>
+              <div className="text-[9px] text-zinc-500 font-semibold truncate mt-0.5" title={voiceChannelName}>
+                {voiceChannelName}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              onClick={() => setVoiceMuted(!voiceMuted)}
+              className={`p-1.5 rounded hover:bg-zinc-800 transition-colors border-0 outline-none cursor-pointer ${
+                voiceMuted ? 'text-rose-500' : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+              title={voiceMuted ? 'Bật âm thanh micro' : 'Tắt tiếng micro'}
+            >
+              {voiceMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              onClick={() => setVoiceDeafened(!voiceDeafened)}
+              className={`p-1.5 rounded hover:bg-zinc-800 transition-colors border-0 outline-none cursor-pointer ${
+                voiceDeafened ? 'text-rose-500' : 'text-zinc-450 hover:text-zinc-200'
+              }`}
+              title={voiceDeafened ? 'Bật âm thanh cuộc gọi' : 'Tắt âm thanh cuộc gọi'}
+            >
+              {voiceDeafened ? <Volume2 className="w-3.5 h-3.5 text-rose-500" /> : <Headphones className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              onClick={disconnectCall}
+              className="p-1.5 rounded hover:bg-rose-950/30 text-rose-500 hover:text-rose-400 transition-colors border-0 outline-none cursor-pointer"
+              title="Ngắt kết nối"
+            >
+              <PhoneOff className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Share / Active Workspace ID */}
       {activeWorkspaceId && activeFilter === 'workspaces' && (
-        <div className="p-3 bg-zinc-950/30 m-2 rounded-xl border border-zinc-900/60 text-[10px] transition-all">
-          <span className="text-zinc-500 block font-semibold mb-1">ID Không gian:</span>
-          <span className="text-zinc-400 font-mono select-text break-all block p-1.5 bg-zinc-950 rounded-lg border border-zinc-900/50">
-            {activeWorkspaceId}
-          </span>
+        <div className="px-4 py-2.5 bg-zinc-950/20 border-t border-zinc-950/60 flex items-center justify-between text-xs text-zinc-455">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Share2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span className="font-semibold text-zinc-300 truncate" title={activeWs?.name}>
+              {activeWs?.name || 'Không gian'}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {activeWs?.invite_code ? (
+              <>
+                <button
+                  onClick={handleCopyCode}
+                  className="flex items-center gap-1 px-1.5 py-1 hover:bg-zinc-800/80 hover:text-zinc-200 rounded text-[10px] text-zinc-400 transition-colors border-0 cursor-pointer outline-none bg-transparent font-mono font-medium"
+                  title="Sao chép Mã mời"
+                >
+                  {copiedCode ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                  <span>{activeWs.invite_code}</span>
+                </button>
+                <button
+                  onClick={handleCopyLink}
+                  className="p-1 hover:bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 transition-colors border-0 cursor-pointer outline-none bg-transparent rounded"
+                  title="Sao chép Link mời"
+                >
+                  {copiedLink ? <Check className="w-3 h-3 text-emerald-500" /> : <Link className="w-3 h-3" />}
+                </button>
+              </>
+            ) : null}
+
+            {activeWorkspaceId !== activeWs?.invite_code && (
+              <button
+                onClick={handleCopyId}
+                className="p-1 hover:bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 transition-colors border-0 cursor-pointer outline-none bg-transparent rounded"
+                title="Sao chép ID không gian"
+              >
+                {copiedId ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

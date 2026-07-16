@@ -1,7 +1,9 @@
 import type { ChatMessage } from '@/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { CornerUpLeft, FileIcon, ArrowDownToLine, Loader2, MessageSquare } from 'lucide-react';
+import { CornerUpLeft, FileIcon, ArrowDownToLine, Loader2, MessageSquare, PhoneCall, Video } from 'lucide-react';
 import { getAvatarGradient } from '@/lib/utils';
+import { useChatStore } from '@/store/useChatStore';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface ExtendedChatMessage extends ChatMessage {
   parentId?: string;
@@ -34,6 +36,13 @@ export default function MessageItem({
   const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
 
+  // Reactively subscribe to active call participants query cache
+  const { data: callParticipants = [] } = useQuery<any[]>({
+    queryKey: ['call-participants', msg.channel_id],
+    enabled: !!msg.channel_id,
+    staleTime: 3000,
+  });
+
   // Safe timestamp conversion helper
   const getTimestampNum = (ts: string | number | null | undefined): number | null => {
     if (ts === null || ts === undefined) return null;
@@ -53,9 +62,68 @@ export default function MessageItem({
   const imageMatch = msg.content.match(/^\[image:([^:]+):([^\]]+)\]/);
   const fileMatch = msg.content.match(/^\[file:([^:]+):([^\]]+)\]/);
   const uploadingMatch = msg.content.match(/^\[uploading:([^\]]+)\]/);
+  const callVoiceMatch = msg.content.match(/^\[call:voice:active\]/);
+  const callVideoMatch = msg.content.match(/^\[call:video:active\]/);
 
   // Render message body content based on parsed type
   const renderContent = () => {
+    if (callVoiceMatch || callVideoMatch) {
+      const isVideo = !!callVideoMatch;
+      const queryClient = useQueryClient();
+      const channelMessages = queryClient.getQueryData<ChatMessage[]>(['messages', msg.channel_id]) || [];
+      const latestCallMsg = [...channelMessages]
+        .reverse()
+        .find(m => m.content.match(/^\[call:(voice|video):active\]/));
+      const isLatestCall = latestCallMsg ? latestCallMsg.id === msg.id : true;
+      const isCallActive = (callParticipants.length > 0 && isLatestCall) || useChatStore.getState().activeVoiceChannelId === msg.channel_id;
+      const isUserInCall = useChatStore.getState().activeVoiceChannelId === msg.channel_id;
+
+      return (
+        <div className="mt-2 flex items-center justify-between p-3.5 bg-zinc-950/50 rounded-2xl border border-zinc-800/80 max-w-sm hover:border-indigo-500/20 transition shadow-lg backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+              isCallActive 
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 animate-pulse'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-450'
+            }`}>
+              {isVideo ? <Video className="w-5 h-5" /> : <PhoneCall className="w-5 h-5" />}
+            </div>
+            <div className="text-left">
+              <div className="text-xs font-bold text-white">
+                Cuộc gọi {isVideo ? 'video' : 'thoại'} đã bắt đầu
+              </div>
+              <div className="text-[10px] text-zinc-550 mt-0.5">
+                {isUserInCall
+                  ? 'Đang diễn ra • Bạn đã tham gia'
+                  : isCallActive 
+                    ? 'Đang diễn ra • Nhấp tham gia ngay' 
+                    : 'Đã kết thúc cuộc gọi'}
+              </div>
+            </div>
+          </div>
+          
+          {isUserInCall ? (
+            <div className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-emerald-500/20 text-emerald-400 bg-emerald-500/5 select-none font-medium">
+              Đã tham gia
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                useChatStore.getState().setActiveVoiceChannelId(msg.channel_id);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition border-0 active:scale-95 outline-none ${
+                isCallActive
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/10'
+                  : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-300'
+              }`}
+            >
+              {isCallActive ? 'Tham gia' : 'Gọi lại'}
+            </button>
+          )}
+        </div>
+      );
+    }
+
     if (imageMatch) {
       const [_, fileName, url] = imageMatch;
       return (

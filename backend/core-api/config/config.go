@@ -23,6 +23,9 @@ type Config struct {
 	GrpcPort           string
 	ScyllaHosts        string
 	ScyllaKeyspace     string
+	LiveKitURL         string
+	LiveKitApiKey      string
+	LiveKitApiSecret   string
 }
 
 func LoadConfig() *Config {
@@ -52,6 +55,9 @@ func LoadConfig() *Config {
 		GrpcPort:           getEnv("GRPC_PORT", "50051"),
 		ScyllaHosts:        getEnv("SCYLLA_HOSTS", "localhost:9042"),
 		ScyllaKeyspace:     getEnv("SCYLLA_KEYSPACE", "chat_messages"),
+		LiveKitURL:         getEnv("LIVEKIT_URL", "http://localhost:7880"),
+		LiveKitApiKey:      getEnv("LIVEKIT_API_KEY", "devkey"),
+		LiveKitApiSecret:   getEnv("LIVEKIT_API_SECRET", "secret"),
 	}
 }
 
