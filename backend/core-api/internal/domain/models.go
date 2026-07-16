@@ -72,3 +72,23 @@ type WorkspaceMember struct {
 	JoinedAt    time.Time `json:"joined_at"`
 	User        User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
+
+type DMChannel struct {
+	ID          string         `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	WorkspaceID string         `gorm:"type:varchar(36);not null;index" json:"workspace_id"`
+	UserOneID   string         `gorm:"type:varchar(36);not null;index" json:"user_one_id"`
+	UserTwoID   string         `gorm:"type:varchar(36);not null;index" json:"user_two_id"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+
+	UserOne User `gorm:"foreignKey:UserOneID" json:"user_one,omitempty"`
+	UserTwo User `gorm:"foreignKey:UserTwoID" json:"user_two,omitempty"`
+}
+
+func (dm *DMChannel) BeforeCreate(tx *gorm.DB) (err error) {
+	if dm.ID == "" {
+		dm.ID = uuid.New().String()
+	}
+	return
+}

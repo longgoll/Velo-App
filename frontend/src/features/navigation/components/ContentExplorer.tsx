@@ -3,18 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
 import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe } from 'lucide-react';
 import api from '@/lib/api';
-import type { Channel, Workspace } from '@/types';
+import type { Channel, Workspace, DMChannel, WorkspaceMember } from '@/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getAvatarGradient } from '@/lib/utils';
-
-// Mock data for DMs
-const MOCK_DMS = [
-  { id: 'dm-1', username: 'Hoàng Long', status: 'online', statusColor: 'bg-emerald-500', glowColor: 'shadow-emerald-500/30' },
-  { id: 'dm-ai', username: 'AI Assistant', status: 'online', statusColor: 'bg-indigo-400', glowColor: 'shadow-indigo-400/30' },
-  { id: 'dm-2', username: 'Alice Smith', status: 'idle', statusColor: 'bg-amber-500', glowColor: 'shadow-amber-500/30' },
-  { id: 'dm-3', username: 'Bob Johnson', status: 'offline', statusColor: 'bg-zinc-500', glowColor: 'shadow-zinc-500/10' },
-];
 
 // Mock data for Communities
 const MOCK_COMMUNITIES = [
@@ -78,6 +70,70 @@ export default function ContentExplorer() {
     enabled: !!activeWorkspaceId && activeFilter === 'workspaces',
   });
 
+  // Fetch workspace members to initiate DM
+  const { data: members = [] } = useQuery<WorkspaceMember[]>({
+    queryKey: ['workspace-members', activeWorkspaceId],
+    queryFn: async () => {
+      if (!activeWorkspaceId) return [];
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/members`);
+      return res.data;
+    },
+    enabled: !!activeWorkspaceId && activeFilter === 'dms',
+  });
+
+  // Fetch active DM channels
+  const { data: dmChannels = [], refetch: refetchDms } = useQuery<DMChannel[]>({
+    queryKey: ['dms', activeWorkspaceId],
+    queryFn: async () => {
+      if (!activeWorkspaceId) return [];
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/dms`);
+      return res.data;
+    },
+    enabled: !!activeWorkspaceId && activeFilter === 'dms',
+  });
+
+  // Current logged in user info
+  const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+
+  const handleMemberClick = async (recipientId: string) => {
+    try {
+      const res = await api.post(`/workspaces/${activeWorkspaceId}/dms`, {
+        recipient_id: recipientId,
+      });
+      const newDmChannel = res.data as DMChannel;
+      await refetchDms();
+      setActiveChannelId(newDmChannel.id);
+      setDmSearch('');
+    } catch (err) {
+      console.error('Failed to start DM channel:', err);
+    }
+  };
+
+  const getStatus = (username: string) => {
+    const code = username.charCodeAt(0) % 3;
+    if (code === 0) return { status: 'online', statusColor: 'bg-emerald-500', glowColor: 'shadow-emerald-500/30' };
+    if (code === 1) return { status: 'idle', statusColor: 'bg-amber-500', glowColor: 'shadow-amber-500/30' };
+    return { status: 'offline', statusColor: 'bg-zinc-500', glowColor: 'shadow-zinc-500/10' };
+  };
+
+  const filteredMembers = members.filter((m) => {
+    if (!m.user) return false;
+    if (m.user.id === currentUser?.id) return false;
+    return m.user.username.toLowerCase().includes(dmSearch.toLowerCase());
+  });
+
+  const activeDmsList = dmChannels.map((dm) => {
+    const otherUser = dm.user_one_id === currentUser?.id ? dm.user_two : dm.user_one;
+    const username = otherUser?.username || 'Trò chuyện';
+    const statusDetails = getStatus(username);
+    return {
+      id: dm.id,
+      username,
+      ...statusDetails,
+    };
+  });
+
   // Auto-select first workspace if none is active or active is invalid
   useEffect(() => {
     if (workspaces.length > 0) {
@@ -93,6 +149,13 @@ export default function ContentExplorer() {
   // Auto-select first text channel of the active workspace if none is active or active is invalid
   useEffect(() => {
     if (activeWorkspaceId && channels.length > 0) {
+      // If we are in DMs filter view, or the active channel is a DM, do not reset it to a standard workspace channel
+      const isDm = activeFilter === 'dms' || 
+                   (dmChannels && dmChannels.some((d) => d.id === activeChannelId));
+      if (isDm) {
+        return;
+      }
+
       const isValid = channels.some((c) => c.id === activeChannelId);
       if (!isValid) {
         const firstText = channels.find((c) => c.type === 'text');
@@ -105,7 +168,7 @@ export default function ContentExplorer() {
     } else if (!activeWorkspaceId && activeChannelId !== null) {
       setActiveChannelId(null);
     }
-  }, [channels, activeWorkspaceId, activeChannelId, setActiveChannelId]);
+  }, [channels, activeWorkspaceId, activeChannelId, setActiveChannelId, activeFilter, dmChannels]);
 
   if (!explorerOpen) return null;
 
@@ -341,34 +404,66 @@ export default function ContentExplorer() {
 
             <ScrollArea className="flex-1 px-2 py-2">
               <div className="space-y-0.5">
-                {MOCK_DMS.filter(d => d.username.toLowerCase().includes(dmSearch.toLowerCase())).map((dm) => {
-                  const isActive = activeChannelId === dm.id;
-                  return (
-                    <button
-                      key={dm.id}
-                      onClick={() => setActiveChannelId(dm.id)}
-                      className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-xs font-medium transition outline-none ${
-                        isActive
-                          ? 'bg-zinc-800/80 text-white shadow-sm'
-                          : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
-                      }`}
-                    >
-                      <div className="relative">
-                        <Avatar size="sm" className={`shadow-[0_0_8px_rgba(0,0,0,0.3)] transition-all ${dm.status === 'online' ? 'ring-1 ring-emerald-500/20' : ''}`}>
-                          <AvatarFallback className={`text-[10px] font-semibold ${getAvatarGradient(dm.username)}`}>
-                            {dm.username.slice(0, 1).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {/* Glow ambient presence indicator */}
-                        <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 ${dm.statusColor} shadow-sm`} />
-                      </div>
-                      <div className="truncate text-left flex-1">
-                        <div className="truncate font-semibold text-zinc-200">{dm.username}</div>
-                        <div className="text-[10px] text-zinc-500 font-normal truncate mt-0.5 capitalize">{dm.status}</div>
-                      </div>
-                    </button>
-                  );
-                })}
+                {dmSearch ? (
+                  /* Searching users in workspace to DM */
+                  <>
+                    <div className="text-[10px] font-bold text-zinc-500 px-2 py-1 uppercase tracking-wider">Thành viên Workspace</div>
+                    {filteredMembers.map((m) => {
+                      if (!m.user) return null;
+                      const statusDetails = getStatus(m.user.username);
+                      return (
+                        <button
+                          key={m.user.id}
+                          onClick={() => handleMemberClick(m.user!.id)}
+                          className="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-xs font-medium transition text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200 outline-none"
+                        >
+                          <Avatar size="sm">
+                            <AvatarFallback className={`text-[10px] font-semibold ${getAvatarGradient(m.user.username)}`}>
+                              {m.user.username.slice(0, 1).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="truncate text-left flex-1">
+                            <div className="truncate font-semibold text-zinc-200">{m.user.username}</div>
+                            <div className="text-[10px] text-zinc-500 font-normal truncate mt-0.5 capitalize">{statusDetails.status}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {filteredMembers.length === 0 && (
+                      <div className="text-zinc-500 text-xs px-2 py-2 italic text-center">Không tìm thấy thành viên nào</div>
+                    )}
+                  </>
+                ) : (
+                  /* Active DMs list */
+                  activeDmsList.map((dm) => {
+                    const isActive = activeChannelId === dm.id;
+                    return (
+                      <button
+                        key={dm.id}
+                        onClick={() => setActiveChannelId(dm.id)}
+                        className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-xs font-medium transition outline-none ${
+                          isActive
+                            ? 'bg-zinc-800/80 text-white shadow-sm'
+                            : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
+                        }`}
+                      >
+                        <div className="relative">
+                          <Avatar size="sm" className={`shadow-[0_0_8px_rgba(0,0,0,0.3)] transition-all ${dm.status === 'online' ? 'ring-1 ring-emerald-500/20' : ''}`}>
+                            <AvatarFallback className={`text-[10px] font-semibold ${getAvatarGradient(dm.username)}`}>
+                              {dm.username.slice(0, 1).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          {/* Glow ambient presence indicator */}
+                          <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 ${dm.statusColor} shadow-sm`} />
+                        </div>
+                        <div className="truncate text-left flex-1">
+                          <div className="truncate font-semibold text-zinc-200">{dm.username}</div>
+                          <div className="text-[10px] text-zinc-500 font-normal truncate mt-0.5 capitalize">{dm.status}</div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </ScrollArea>
           </div>

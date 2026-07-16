@@ -70,3 +70,48 @@ func (r *workspaceGormRepository) GetMember(workspaceID, userID string) (*domain
 	}
 	return &member, nil
 }
+
+func (r *workspaceGormRepository) ListMembers(workspaceID string) ([]domain.WorkspaceMember, error) {
+	var members []domain.WorkspaceMember
+	err := r.db.Preload("User").Where("workspace_id = ?", workspaceID).Find(&members).Error
+	return members, err
+}
+
+func (r *workspaceGormRepository) CreateDMChannel(dm *domain.DMChannel) error {
+	return r.db.Create(dm).Error
+}
+
+func (r *workspaceGormRepository) GetDMChannel(workspaceID, userOneID, userTwoID string) (*domain.DMChannel, error) {
+	var dm domain.DMChannel
+	err := r.db.Where("workspace_id = ? AND ((user_one_id = ? AND user_two_id = ?) OR (user_one_id = ? AND user_two_id = ?))",
+		workspaceID, userOneID, userTwoID, userTwoID, userOneID).
+		First(&dm).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &dm, nil
+}
+
+func (r *workspaceGormRepository) GetDMChannelByID(id string) (*domain.DMChannel, error) {
+	var dm domain.DMChannel
+	err := r.db.Preload("UserOne").Preload("UserTwo").Where("id = ?", id).First(&dm).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &dm, nil
+}
+
+func (r *workspaceGormRepository) ListDMChannelsForUser(workspaceID, userID string) ([]domain.DMChannel, error) {
+	var dms []domain.DMChannel
+	err := r.db.Preload("UserOne").Preload("UserTwo").
+		Where("workspace_id = ? AND (user_one_id = ? OR user_two_id = ?)", workspaceID, userID, userID).
+		Order("created_at desc").
+		Find(&dms).Error
+	return dms, err
+}

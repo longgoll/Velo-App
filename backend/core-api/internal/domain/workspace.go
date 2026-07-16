@@ -10,6 +10,11 @@ type WorkspaceRepository interface {
 	ListForUser(userID string) ([]Workspace, error)
 	AddMember(member *WorkspaceMember) error
 	GetMember(workspaceID, userID string) (*WorkspaceMember, error)
+	ListMembers(workspaceID string) ([]WorkspaceMember, error)
+	CreateDMChannel(dm *DMChannel) error
+	GetDMChannel(workspaceID, userOneID, userTwoID string) (*DMChannel, error)
+	GetDMChannelByID(id string) (*DMChannel, error)
+	ListDMChannelsForUser(workspaceID, userID string) ([]DMChannel, error)
 }
 
 type WorkspaceUseCase interface {
@@ -18,4 +23,8 @@ type WorkspaceUseCase interface {
 	GetByID(workspaceID string) (*Workspace, error)
 	Join(userID string, workspaceID string) error
 	GetMember(workspaceID, userID string) (*WorkspaceMember, error)
+	ListMembers(userID string, workspaceID string) ([]WorkspaceMember, error)
+	GetOrCreateDMChannel(userID string, workspaceID string, recipientID string) (*DMChannel, error)
+	GetDMChannelByID(id string) (*DMChannel, error)
+	ListDMChannels(userID string, workspaceID string) ([]DMChannel, error)
 }

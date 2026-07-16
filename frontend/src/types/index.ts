@@ -25,3 +25,22 @@ export interface ChatMessage {
   content: string;
   timestamp: string | number;
 }
+
+export interface DMChannel {
+  id: string;
+  workspace_id: string;
+  user_one_id: string;
+  user_two_id: string;
+  created_at: string;
+  updated_at: string;
+  user_one?: UserData;
+  user_two?: UserData;
+}
+
+export interface WorkspaceMember {
+  workspace_id: string;
+  user_id: string;
+  role: string;
+  joined_at: string;
+  user?: UserData;
+}

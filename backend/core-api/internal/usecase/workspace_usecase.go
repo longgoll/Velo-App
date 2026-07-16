@@ -73,3 +73,76 @@ func (u *workspaceUseCase) Join(userID string, workspaceID string) error {
 func (u *workspaceUseCase) GetMember(workspaceID, userID string) (*domain.WorkspaceMember, error) {
 	return u.workspaceRepo.GetMember(workspaceID, userID)
 }
+
+func (u *workspaceUseCase) ListMembers(userID string, workspaceID string) ([]domain.WorkspaceMember, error) {
+	// Check if user is a member of the workspace
+	member, err := u.workspaceRepo.GetMember(workspaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if member == nil {
+		return nil, errors.New("access denied: you are not a member of this workspace")
+	}
+
+	return u.workspaceRepo.ListMembers(workspaceID)
+}
+
+func (u *workspaceUseCase) GetOrCreateDMChannel(userID string, workspaceID string, recipientID string) (*domain.DMChannel, error) {
+	// Check if user is member of workspace
+	member, err := u.workspaceRepo.GetMember(workspaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if member == nil {
+		return nil, errors.New("access denied: you are not a member of this workspace")
+	}
+
+	// Check if recipient is member of workspace
+	recipientMember, err := u.workspaceRepo.GetMember(workspaceID, recipientID)
+	if err != nil {
+		return nil, err
+	}
+	if recipientMember == nil {
+		return nil, errors.New("recipient is not a member of this workspace")
+	}
+
+	// Retrieve if exists
+	existing, err := u.workspaceRepo.GetDMChannel(workspaceID, userID, recipientID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return u.workspaceRepo.GetDMChannelByID(existing.ID)
+	}
+
+	// Create new DM channel
+	dm := &domain.DMChannel{
+		WorkspaceID: workspaceID,
+		UserOneID:   userID,
+		UserTwoID:   recipientID,
+	}
+
+	err = u.workspaceRepo.CreateDMChannel(dm)
+	if err != nil {
+		return nil, err
+	}
+
+	return u.workspaceRepo.GetDMChannelByID(dm.ID)
+}
+
+func (u *workspaceUseCase) GetDMChannelByID(id string) (*domain.DMChannel, error) {
+	return u.workspaceRepo.GetDMChannelByID(id)
+}
+
+func (u *workspaceUseCase) ListDMChannels(userID string, workspaceID string) ([]domain.DMChannel, error) {
+	// Check if user is member of workspace
+	member, err := u.workspaceRepo.GetMember(workspaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if member == nil {
+		return nil, errors.New("access denied: you are not a member of this workspace")
+	}
+
+	return u.workspaceRepo.ListDMChannelsForUser(workspaceID, userID)
+}

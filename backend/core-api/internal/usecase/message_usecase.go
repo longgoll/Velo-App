@@ -31,26 +31,39 @@ func (u *messageUseCase) GetHistory(userID string, channelID string, limit int, 
 	if err != nil {
 		return nil, err
 	}
-	if channel == nil {
-		return nil, errors.New("channel not found")
+
+	if channel != nil {
+		// 2. Check if user is a member of the workspace
+		member, err := u.workspaceRepo.GetMember(channel.WorkspaceID, userID)
+		if err != nil {
+			return nil, err
+		}
+		if member == nil {
+			return nil, errors.New("access denied: you are not a member of this workspace")
+		}
+	} else {
+		// 3. Try to get DM Channel
+		dmChannel, err := u.workspaceRepo.GetDMChannelByID(channelID)
+		if err != nil {
+			return nil, err
+		}
+		if dmChannel == nil {
+			return nil, errors.New("channel not found")
+		}
+
+		// Check if user is participant of DM
+		if dmChannel.UserOneID != userID && dmChannel.UserTwoID != userID {
+			return nil, errors.New("access denied: you are not a participant of this direct message channel")
+		}
 	}
 
-	// 2. Check if user is a member of the workspace
-	member, err := u.workspaceRepo.GetMember(channel.WorkspaceID, userID)
-	if err != nil {
-		return nil, err
-	}
-	if member == nil {
-		return nil, errors.New("access denied: you are not a member of this workspace")
-	}
-
-	// 3. Set limit constraints
+	// 4. Set limit constraints
 	if limit <= 0 {
 		limit = 50
 	} else if limit > 100 {
 		limit = 100
 	}
 
-	// 4. Fetch messages from ScyllaDB
+	// 5. Fetch messages from ScyllaDB
 	return u.messageRepo.GetByChannel(channelID, limit, before)
 }

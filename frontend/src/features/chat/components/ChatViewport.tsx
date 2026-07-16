@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
 import api from '@/lib/api';
 import { Hash, PhoneCall, Video, MessageSquare, Upload, X, CornerUpLeft, Sparkles, Plus, Compass, Layers, ArrowDown } from 'lucide-react';
-import type { Channel, ChatMessage, Workspace } from '@/types';
+import type { Channel, ChatMessage, Workspace, DMChannel } from '@/types';
 import MessageItem from './MessageItem';
 import ThreadSidebar from './ThreadSidebar';
 import ChatInput from './ChatInput';
@@ -63,31 +63,24 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
 
   const activeChannel = channels.find((c) => c.id === activeChannelId);
 
-  // Fetch messages from ScyllaDB history via Core API or Mock for DMs
+  // Fetch active DM channels
+  const { data: dmChannels = [] } = useQuery<DMChannel[]>({
+    queryKey: ['dms', activeWorkspaceId],
+    queryFn: async () => {
+      if (!activeWorkspaceId) return [];
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/dms`);
+      return res.data;
+    },
+    enabled: !!activeWorkspaceId,
+  });
+
+  const activeDmChannel = dmChannels.find((d) => d.id === activeChannelId);
+
+  // Fetch messages from ScyllaDB history via Core API
   const { data: messages = [] } = useQuery<ChatMessage[]>({
     queryKey: ['messages', activeChannelId],
     queryFn: async () => {
       if (!activeChannelId) return [];
-      
-      // If it is a Mock DM channel, load mock conversations
-      if (activeChannelId.startsWith('dm-')) {
-        const initialDmMessages: Record<string, ChatMessage[]> = {
-          'dm-1': [
-            { id: 'm-dm1-1', channel_id: 'dm-1', user_id: 'user-hl', username: 'Hoàng Long', content: 'Chào bạn! Mình có thể giúp gì cho bạn hôm nay?', timestamp: Date.now() - 3600000 },
-            { id: 'm-dm1-2', channel_id: 'dm-1', user_id: 'user-hl', username: 'Hoàng Long', content: 'Dự án chat thế hệ mới này chạy mượt mà quá!', timestamp: Date.now() - 1800000 },
-          ],
-          'dm-ai': [
-            { id: 'm-dmai-1', channel_id: 'dm-ai', user_id: 'user-ai', username: 'AI Assistant', content: 'Xin chào! Tôi là trợ lý AI. Tôi có thể tự động trả lời tin nhắn của bạn lập tức. Thử gửi tin nhắn cho tôi xem sao!', timestamp: Date.now() - 60000 },
-          ],
-          'dm-2': [
-            { id: 'm-dm2-1', channel_id: 'dm-2', user_id: 'user-alice', username: 'Alice Smith', content: 'Hi! Cậu có rảnh thiết kế lại giao diện cho tớ không?', timestamp: Date.now() - 7200000 },
-          ],
-          'dm-3': [
-            { id: 'm-dm3-1', channel_id: 'dm-3', user_id: 'user-bob', username: 'Bob Johnson', content: 'Tớ vừa cấu hình xong SeaweedFS rồi nhé.', timestamp: Date.now() - 14400000 },
-          ]
-        };
-        return initialDmMessages[activeChannelId] || [];
-      }
       
       const res = await api.get(`/channels/${activeChannelId}/messages?limit=50`);
       const msgs = res.data as ChatMessage[];
@@ -96,42 +89,9 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     enabled: !!activeChannelId,
   });
 
-  // Intercept sending messages to handle reply prefixes and mock DMs
+  // Intercept sending messages to handle reply prefixes
   const handleSendMessage = (channelId: string, content: string) => {
-    if (channelId.startsWith('dm-')) {
-      const newMessage: ChatMessage = {
-        id: `m-local-${Date.now()}`,
-        channel_id: channelId,
-        user_id: currentUser?.id || 'me',
-        username: currentUser?.username || 'Me',
-        content: content,
-        timestamp: Date.now(),
-      };
-
-      // Append locally to cache
-      queryClient.setQueryData(['messages', channelId], (old: ChatMessage[] | undefined) => {
-        return [...(old || []), newMessage];
-      });
-
-      // AI Chatbot automatic responses
-      if (channelId === 'dm-ai') {
-        setTimeout(() => {
-          const aiResponse: ChatMessage = {
-            id: `m-local-ai-${Date.now()}`,
-            channel_id: 'dm-ai',
-            user_id: 'user-ai',
-            username: 'AI Assistant',
-            content: `Tôi đã nhận được tin nhắn của bạn: "${content}". Rất vui được trò chuyện với bạn!`,
-            timestamp: Date.now(),
-          };
-          queryClient.setQueryData(['messages', 'dm-ai'], (old: ChatMessage[] | undefined) => {
-            return [...(old || []), aiResponse];
-          });
-        }, 1500);
-      }
-    } else {
-      onSendMessage(channelId, content);
-    }
+    onSendMessage(channelId, content);
   };
 
   // Send a threaded reply message
@@ -139,41 +99,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     if (!activeThreadMessage || !activeChannelId) return;
 
     const replyContent = `[reply:${activeThreadMessage.id}:${activeThreadMessage.username}] ${content}`;
-
-    if (activeChannelId.startsWith('dm-')) {
-      const newMessage: ChatMessage = {
-        id: `m-local-${Date.now()}`,
-        channel_id: activeChannelId,
-        user_id: currentUser?.id || 'me',
-        username: currentUser?.username || 'Me',
-        content: replyContent,
-        timestamp: Date.now(),
-      };
-
-      // Append locally to cache
-      queryClient.setQueryData(['messages', activeChannelId], (old: ChatMessage[] | undefined) => {
-        return [...(old || []), newMessage];
-      });
-
-      // AI Chatbot automatic responses in thread
-      if (activeChannelId === 'dm-ai') {
-        setTimeout(() => {
-          const aiResponse: ChatMessage = {
-            id: `m-local-ai-${Date.now()}`,
-            channel_id: 'dm-ai',
-            user_id: 'user-ai',
-            username: 'AI Assistant',
-            content: `[reply:${newMessage.id}:Me] Tôi đã nhận được phản hồi của bạn trong luồng: "${content}". Rất thú vị!`,
-            timestamp: Date.now(),
-          };
-          queryClient.setQueryData(['messages', 'dm-ai'], (old: ChatMessage[] | undefined) => {
-            return [...(old || []), aiResponse];
-          });
-        }, 1500);
-      }
-    } else {
-      onSendMessage(activeChannelId, replyContent);
-    }
+    onSendMessage(activeChannelId, replyContent);
   };
 
   const uploadFile = (file: File) => {
@@ -229,10 +155,8 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
           });
         });
 
-        // Broadcast to workspace if not DM
-        if (!activeChannelId.startsWith('dm-')) {
-          onSendMessage(activeChannelId, finalContent);
-        }
+        // Broadcast to channel/DM
+        onSendMessage(activeChannelId, finalContent);
       } else {
         queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
           return (old || []).map((m: any) => {
@@ -528,9 +452,13 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
   }
 
   // Get active channel or DM title
-  const chatTitle = activeChannelId.startsWith('dm-')
-    ? (activeChannelId === 'dm-ai' ? 'AI Assistant' : activeChannelId === 'dm-1' ? 'Hoàng Long' : activeChannelId === 'dm-2' ? 'Alice Smith' : 'Bob Johnson')
-    : (activeChannel?.name || 'Kênh chat');
+  let chatTitle = 'Kênh chat';
+  if (activeDmChannel) {
+    const otherUser = activeDmChannel.user_one_id === currentUser?.id ? activeDmChannel.user_two : activeDmChannel.user_one;
+    chatTitle = otherUser?.username || 'Trò chuyện';
+  } else if (activeChannel) {
+    chatTitle = activeChannel.name;
+  }
 
   return (
     <div 
@@ -562,7 +490,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
         {/* Chat Header */}
         <div className="px-6 h-[52px] border-b border-zinc-950/80 flex items-center justify-between bg-zinc-900/40 backdrop-blur-md shadow-sm shrink-0 z-10">
           <div className="flex items-center gap-2 min-w-0">
-            {activeChannelId.startsWith('dm-') ? (
+            {activeDmChannel ? (
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
             ) : (
               <Hash className="w-5 h-5 text-zinc-500 shrink-0" />
