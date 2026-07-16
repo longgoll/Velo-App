@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
-import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe } from 'lucide-react';
+import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe, Bell } from 'lucide-react';
 import api from '@/lib/api';
 import type { Channel, Workspace, DMChannel, WorkspaceMember } from '@/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,6 +23,7 @@ export default function ContentExplorer() {
     activeFilter,
     unreadChannels,
     activeVoiceChannelId,
+    recentConversations,
     setActiveWorkspaceId,
     setActiveChannelId,
     toggleExplorer,
@@ -30,6 +31,7 @@ export default function ContentExplorer() {
     setShowCreateWs,
     setShowJoinWs,
     setShowCreateChan,
+    setActiveFilter,
   } = useChatStore();
 
   const [textFolderOpen, setTextFolderOpen] = useState(true);
@@ -57,6 +59,74 @@ export default function ContentExplorer() {
       return res.data;
     },
   });
+
+  // Fetch channels for all workspaces
+  const allWorkspaceChannelsQueries = useQueries({
+    queries: workspaces.map((ws) => ({
+      queryKey: ['channels', ws.id],
+      queryFn: async () => {
+        const res = await api.get(`/workspaces/${ws.id}/channels`);
+        return res.data as Channel[];
+      },
+      enabled: workspaces.length > 0,
+    })),
+  });
+
+  // Fetch DMs for all workspaces
+  const allWorkspaceDmsQueries = useQueries({
+    queries: workspaces.map((ws) => ({
+      queryKey: ['dms', ws.id],
+      queryFn: async () => {
+        const res = await api.get(`/workspaces/${ws.id}/dms`);
+        return res.data as DMChannel[];
+      },
+      enabled: workspaces.length > 0,
+    })),
+  });
+
+  const allExplorerChannels = allWorkspaceChannelsQueries.flatMap((q) => q.data || []);
+  const allExplorerDms = allWorkspaceDmsQueries.flatMap((q) => q.data || []);
+
+  const explorerWorkspaceMap = workspaces.reduce((acc, ws) => {
+    acc[ws.id] = ws.name;
+    return acc;
+  }, {} as Record<string, string>);
+
+  const getExplorerChannelInfo = (id: string) => {
+    const channel = allExplorerChannels.find((c) => c.id === id);
+    if (channel) {
+      return {
+        id: channel.id,
+        name: channel.name,
+        type: channel.type,
+        workspaceId: channel.workspace_id,
+        workspaceName: explorerWorkspaceMap[channel.workspace_id] || 'Workspace',
+        isDm: false,
+      };
+    }
+    const dm = allExplorerDms.find((d) => d.id === id);
+    if (dm) {
+      const currentUserStr = localStorage.getItem('user');
+      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+      const otherUser = dm.user_one_id === currentUser?.id ? dm.user_two : dm.user_one;
+      return {
+        id: dm.id,
+        name: otherUser?.username || 'Trò chuyện',
+        type: 'text' as const,
+        workspaceId: dm.workspace_id,
+        workspaceName: explorerWorkspaceMap[dm.workspace_id] || 'Workspace',
+        isDm: true,
+      };
+    }
+    return null;
+  };
+
+  const getWorkspaceUnreadCount = (wsId: string) => {
+    const wsChannels = allExplorerChannels.filter((c) => c.workspace_id === wsId).map((c) => c.id);
+    const wsDms = allExplorerDms.filter((d) => d.workspace_id === wsId).map((d) => d.id);
+    const wsIds = [...wsChannels, ...wsDms];
+    return wsIds.reduce((sum, id) => sum + (unreadChannels[id] || 0), 0);
+  };
 
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
 
@@ -172,6 +242,12 @@ export default function ContentExplorer() {
 
   if (!explorerOpen) return null;
 
+  const navigateToConversation = (id: string, isDm: boolean, workspaceId: string) => {
+    setActiveWorkspaceId(workspaceId);
+    setActiveFilter(isDm ? 'dms' : 'workspaces');
+    setActiveChannelId(id, isDm ? 'dm' : 'channel', workspaceId);
+  };
+
   const handleChannelClick = (chan: Channel) => {
     if (chan.type === 'voice') {
       // Single-click join voice channel instantly
@@ -215,13 +291,23 @@ export default function ContentExplorer() {
                         setActiveWorkspaceId(ws.id);
                         setWsDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-medium transition ${
+                      className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-medium transition flex items-center justify-between cursor-pointer border-0 outline-none ${
                         activeWorkspaceId === ws.id
                           ? 'bg-indigo-600 text-white'
                           : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
                       }`}
                     >
-                      {ws.name}
+                      <span>{ws.name}</span>
+                      {(() => {
+                        const count = getWorkspaceUnreadCount(ws.id);
+                        return count > 0 ? (
+                          <span className={`flex items-center justify-center min-w-[14px] h-[14px] px-1 text-[8px] font-bold rounded-full ${
+                            activeWorkspaceId === ws.id ? 'bg-white text-indigo-600' : 'bg-rose-500 text-white'
+                          }`}>
+                            {count}
+                          </span>
+                        ) : null;
+                      })()}
                     </button>
                   ))}
                   <div className="border-t border-zinc-800/60 my-1.5" />
@@ -470,19 +556,129 @@ export default function ContentExplorer() {
         )}
 
         {/* ================== ALL MESSAGES ACTIVITIES VIEW ================== */}
-        {activeFilter === 'all' && (
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="px-4 py-3 h-[52px] border-b border-zinc-950/60 flex items-center justify-between">
-              <span className="font-bold text-white text-sm">Tất cả hoạt động</span>
-              <MessageSquare className="w-4 h-4 text-zinc-500" />
-            </div>
+        {activeFilter === 'all' && (() => {
+          const unreadChannelIds = Object.keys(unreadChannels).filter((id) => unreadChannels[id] > 0);
+          
+          const explorerUnreadList = unreadChannelIds
+            .map((id) => getExplorerChannelInfo(id))
+            .filter((item) => item !== null);
 
-            <div className="flex-1 p-4 flex flex-col justify-center items-center text-center text-zinc-500">
-              <MessageSquare className="w-10 h-10 text-zinc-800 mb-2" />
-              <p className="text-xs">Không có tin nhắn chưa đọc hoặc hoạt động nổi bật nào gần đây.</p>
+          const explorerRecentList = recentConversations
+            .map((c) => getExplorerChannelInfo(c.id))
+            .filter((item) => item !== null);
+
+          return (
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="px-4 py-3 h-[52px] border-b border-zinc-950/60 flex items-center justify-between">
+                <span className="font-bold text-white text-sm">Hộp thư chung</span>
+                <MessageSquare className="w-4 h-4 text-zinc-500" />
+              </div>
+
+              <ScrollArea className="flex-1 px-2 py-3">
+                <div className="space-y-4">
+                  {/* Dashboard link */}
+                  <div>
+                    <button
+                      onClick={() => setActiveChannelId(null)}
+                      className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold transition outline-none border-0 text-left cursor-pointer ${
+                        activeChannelId === null
+                          ? 'bg-zinc-800 text-white shadow-sm'
+                          : 'text-indigo-400 hover:bg-zinc-800/30'
+                      }`}
+                    >
+                      <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+                      <span>Xem Bảng Hoạt động</span>
+                    </button>
+                  </div>
+
+                  {/* Group 1: CHƯA ĐỌC */}
+                  {explorerUnreadList.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 px-2 py-1 mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                        <Bell className="w-3.5 h-3.5 text-rose-450 shrink-0" />
+                        <span>Chưa đọc</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {explorerUnreadList.map((item) => {
+                          if (!item) return null;
+                          const Icon = item.isDm ? Users : (item.type === 'voice' ? Volume2 : Hash);
+                          const unreadCount = unreadChannels[item.id] || 0;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => navigateToConversation(item.id, item.isDm, item.workspaceId)}
+                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition outline-none border-0 text-left cursor-pointer ${
+                                activeChannelId === item.id
+                                  ? 'bg-zinc-800 text-white shadow-sm'
+                                  : 'text-zinc-300 hover:bg-zinc-800/20'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Icon className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                                <div className="truncate">
+                                  <span className="font-semibold text-zinc-200 block truncate leading-tight">
+                                    {item.name}
+                                  </span>
+                                  <span className="text-[9px] text-zinc-500 block truncate">
+                                    {item.workspaceName}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="flex items-center justify-center min-w-[16px] h-[16px] px-1 text-[9px] font-bold text-white bg-rose-500 rounded-full shrink-0">
+                                {unreadCount}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Group 2: HOẠT ĐỘNG GẦN ĐÂY */}
+                  <div>
+                    <div className="flex items-center gap-1.5 px-2 py-1 mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                      <MessageSquare className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                      <span>Gần đây</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {explorerRecentList.length > 0 ? (
+                        explorerRecentList.map((item) => {
+                          if (!item) return null;
+                          const Icon = item.isDm ? Users : (item.type === 'voice' ? Volume2 : Hash);
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => navigateToConversation(item.id, item.isDm, item.workspaceId)}
+                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition outline-none border-0 text-left cursor-pointer ${
+                                activeChannelId === item.id
+                                  ? 'bg-zinc-800 text-white shadow-sm'
+                                  : 'text-zinc-400 hover:bg-zinc-800/20 hover:text-zinc-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Icon className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                                <div className="truncate">
+                                  <span className="font-medium text-zinc-300 block truncate leading-tight">
+                                    {item.name}
+                                  </span>
+                                  <span className="text-[9px] text-zinc-550 block truncate">
+                                    {item.workspaceName}
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <p className="text-[10px] text-zinc-650 italic px-2 py-1">Chưa có hoạt động nào</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ================== COMMUNITIES VIEW ================== */}
         {activeFilter === 'communities' && (

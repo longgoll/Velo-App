@@ -59,6 +59,37 @@ export const useWebSocket = (token: string | null) => {
             return [...oldMessages, chatMsg];
           });
 
+          // Tìm workspace_id và type từ cache của React Query
+          const queryCache = queryClient.getQueryCache();
+          const channelQueries = queryCache.findAll({ queryKey: ['channels'] });
+          let wsId = '';
+          let convType: 'channel' | 'dm' = 'channel';
+          
+          for (const q of channelQueries) {
+            const channels = q.state.data as any[];
+            if (Array.isArray(channels) && channels.some(c => c.id === chatMsg.channel_id)) {
+              wsId = q.queryKey[1] as string;
+              convType = 'channel';
+              break;
+            }
+          }
+          
+          if (!wsId) {
+            const dmQueries = queryCache.findAll({ queryKey: ['dms'] });
+            for (const q of dmQueries) {
+              const dms = q.state.data as any[];
+              if (Array.isArray(dms) && dms.some(d => d.id === chatMsg.channel_id)) {
+                wsId = q.queryKey[1] as string;
+                convType = 'dm';
+                break;
+              }
+            }
+          }
+          
+          if (wsId) {
+            useChatStore.getState().addRecentConversation(chatMsg.channel_id, convType, wsId);
+          }
+
           // Xử lý thông báo khi nhận tin ở kênh không hoạt động
           if (chatMsg.channel_id !== activeChannelIdRef.current) {
             useChatStore.getState().incrementUnread(chatMsg.channel_id);

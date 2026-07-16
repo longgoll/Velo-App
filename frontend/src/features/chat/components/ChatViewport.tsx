@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
 import api from '@/lib/api';
-import { Hash, PhoneCall, Video, MessageSquare, Upload, X, CornerUpLeft, Sparkles, Plus, Compass, Layers, ArrowDown } from 'lucide-react';
+import { Hash, PhoneCall, Video, MessageSquare, Upload, Sparkles, Plus, Compass, Layers, ArrowDown } from 'lucide-react';
 import type { Channel, ChatMessage, Workspace, DMChannel } from '@/types';
 import MessageItem from './MessageItem';
 import ThreadSidebar from './ThreadSidebar';
 import ChatInput from './ChatInput';
 import DynamicIslandCall from '../../../components/ui/DynamicIslandCall';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import AllMessagesDashboard from './AllMessagesDashboard';
 
 interface ChatViewportProps {
   onSendMessage: (channelId: string, content: string) => void;
@@ -24,8 +25,10 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     setShowCreateWs,
     setShowJoinWs,
     setShowCreateChan,
-    unreadChannels
+    unreadChannels,
+    activeFilter
   } = useChatStore();
+
   const parentRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -372,6 +375,10 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     // Always sync the length ref
     prevMessagesLength.current = messages.length;
   }, [messages.length, activeChannelId, structuredMessages, currentUser]);
+
+  if (activeFilter === 'all' && !activeChannelId) {
+    return <AllMessagesDashboard onSendMessage={handleSendMessage} />;
+  }
 
   if (!activeChannelId) {
     const hasWorkspaces = workspaces.length > 0;
