@@ -8,15 +8,21 @@ import ChatViewport from '@/features/chat/components/ChatViewport';
 import CreateWorkspaceModal from '@/features/workspace/components/CreateWorkspaceModal';
 import JoinWorkspaceModal from '@/features/workspace/components/JoinWorkspaceModal';
 import CreateChannelModal from '@/features/workspace/components/CreateChannelModal';
+import CommandPalette from '@/components/ui/CommandPalette';
+import { useChatStore } from '@/store/useChatStore';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [user, setUser] = useState<UserData | null>(null);
 
-  // Modal open states
-  const [showCreateWs, setShowCreateWs] = useState(false);
-  const [showJoinWs, setShowJoinWs] = useState(false);
-  const [showCreateChan, setShowCreateChan] = useState(false);
+  const {
+    showCreateWs,
+    setShowCreateWs,
+    showJoinWs,
+    setShowJoinWs,
+    showCreateChan,
+    setShowCreateChan,
+  } = useChatStore();
 
   // WebSocket connection
   const { sendMessage } = useWebSocket(token);
@@ -41,6 +47,8 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('lastWorkspaceId');
+    localStorage.removeItem('lastChannelId');
     setToken(null);
     setUser(null);
   };
@@ -55,12 +63,10 @@ export default function App() {
       <WorkspaceSidebar
         user={user}
         onLogout={handleLogout}
-        onCreateWsClick={() => setShowCreateWs(true)}
-        onJoinWsClick={() => setShowJoinWs(true)}
       />
 
       {/* 2. Fluid Content Explorer Sidebar */}
-      <ContentExplorer onCreateChanClick={() => setShowCreateChan(true)} />
+      <ContentExplorer />
 
       {/* 3. Main Chat Viewport */}
       <ChatViewport onSendMessage={sendMessage} />
@@ -69,6 +75,9 @@ export default function App() {
       <CreateWorkspaceModal open={showCreateWs} onOpenChange={setShowCreateWs} />
       <JoinWorkspaceModal open={showJoinWs} onOpenChange={setShowJoinWs} />
       <CreateChannelModal open={showCreateChan} onOpenChange={setShowCreateChan} />
+      
+      {/* Omni-Command Palette */}
+      <CommandPalette />
     </div>
   );
 }

@@ -110,7 +110,7 @@ export const useWebSocket = (token: string | null) => {
 
   // Subscribe vào channel mới khi channel thay đổi
   useEffect(() => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN && activeChannelId) {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN && activeChannelId && !activeChannelId.startsWith('dm-')) {
       socketRef.current.send(JSON.stringify({
         type: 'subscribe',
         payload: { channel_id: activeChannelId }

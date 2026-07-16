@@ -15,14 +15,14 @@
   - [ ] Xây dựng gRPC Client gọi tới Go Core API để xác thực WebSocket Connection
   - [ ] Kết nối Valkey/NATS Pub/Sub để đồng bộ kết nối các Gateway Node
   - [ ] Xử lý luồng tin nhắn hai chiều Client <=> Gateway <=> Queue
-- [ ] **Phase 4: Frontend React 19 & Đồng bộ Real-time**
-  - [ ] Khởi tạo React 19 + Vite + Tailwind CSS v4
-  - [ ] Cấu hình Zustand & TanStack Query
-  - [ ] Thiết kế UI Sidebar 2-Stage & Message List (Shadcn/ui & Radix UI)
-  - [ ] Kết nối WebSocket qua Custom Hook & Đồng bộ cache của TanStack Query
+- [x] **Phase 4: Frontend React 19 & Đồng bộ Real-time**
+  - [x] Khởi tạo React 19 + Vite + Tailwind CSS v4
+  - [x] Cấu hình Zustand & TanStack Query
+  - [x] Thiết kế UI Sidebar 2-Stage & Message List (Shadcn/ui & Radix UI)
+  - [x] Kết nối WebSocket qua Custom Hook & Đồng bộ cache của TanStack Query
 - [ ] **Phase 5: Hệ thống Upload File Siêu Tốc**
   - [ ] Viết API sinh Presigned URL trên Go Core API
-  - [ ] Xây dựng Frontend Drag-and-Drop và gửi file qua PUT method
+  - [x] Xây dựng Frontend Drag-and-Drop và gửi file qua PUT method
   - [ ] Viết background worker xử lý ảnh (nén, thumbnail)
 - [ ] **Phase 6: Tính năng Gọi điện Voice/Video Call WebRTC**
   - [ ] Tích hợp LiveKit Server & Coturn vào Docker Compose
