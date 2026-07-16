@@ -1,0 +1,31 @@
+# Tiến độ Thực hiện Dự án (Task Checklist)
+
+- [/] **Phase 1: Thiết lập cấu trúc & Môi trường Docker**
+  - [/] Khởi tạo cấu trúc thư mục Monorepo (`/backend/core-api`, `/backend/gateway`, `/frontend`, `/proto`)
+  - [/] Tạo file `docker-compose.yml` để chạy hạ tầng (PostgreSQL, Valkey, NATS, SeaweedFS)
+  - [ ] Khởi tạo cấu hình và file hướng dẫn chạy môi trường Docker
+  - [ ] Định nghĩa các file Protobuf (`/proto/auth.proto`, `/proto/gateway.proto`)
+- [ ] **Phase 2: Phát triển Core API bằng Golang**
+  - [ ] Khởi tạo dự án Golang, cấu hình Clean Architecture & kết nối PostgreSQL
+  - [ ] Xây dựng tính năng Authentication (Đăng ký, Đăng nhập, PASETO token)
+  - [ ] Xây dựng API Workspace & Channel (Text & Voice)
+  - [ ] Cấu hình phân quyền thành viên và API gRPC server
+- [ ] **Phase 3: Xây dựng Rust Gateway & WebSocket**
+  - [ ] Khởi tạo dự án Rust với Axum & Tokio
+  - [ ] Xây dựng gRPC Client gọi tới Go Core API để xác thực WebSocket Connection
+  - [ ] Kết nối Valkey/NATS Pub/Sub để đồng bộ kết nối các Gateway Node
+  - [ ] Xử lý luồng tin nhắn hai chiều Client <=> Gateway <=> Queue
+- [ ] **Phase 4: Frontend React 19 & Đồng bộ Real-time**
+  - [ ] Khởi tạo React 19 + Vite + Tailwind CSS v4
+  - [ ] Cấu hình Zustand & TanStack Query
+  - [ ] Thiết kế UI Sidebar 2-Stage & Message List (Shadcn/ui & Radix UI)
+  - [ ] Kết nối WebSocket qua Custom Hook & Đồng bộ cache của TanStack Query
+- [ ] **Phase 5: Hệ thống Upload File Siêu Tốc**
+  - [ ] Viết API sinh Presigned URL trên Go Core API
+  - [ ] Xây dựng Frontend Drag-and-Drop và gửi file qua PUT method
+  - [ ] Viết background worker xử lý ảnh (nén, thumbnail)
+- [ ] **Phase 6: Tính năng Gọi điện Voice/Video Call WebRTC**
+  - [ ] Tích hợp LiveKit Server & Coturn vào Docker Compose
+  - [ ] Xử lý API sinh token cuộc gọi phía Go Backend
+  - [ ] Xây dựng WebRTC Signaling qua WebSocket của Rust Gateway
+  - [ ] Triển khai LiveKit SDK ở Frontend & Thiết kế UI cuộc gọi (Dynamic Island / PiP)

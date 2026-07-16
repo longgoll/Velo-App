@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package gateway;
+
+option go_package = "github.com/hoanglong/chat/backend/core-api/pkg/pb/gateway";
+
+service GatewayService {
+  // Kiểm tra quyền của user đối với một channel trước khi cho phép subscribe hoặc gửi tin nhắn
+  rpc CheckChannelAccess (CheckChannelAccessRequest) returns (CheckChannelAccessResponse);
+}
+
+message CheckChannelAccessRequest {
+  string user_id = 1;
+  string channel_id = 2;
+}
+
+message CheckChannelAccessResponse {
+  bool is_allowed = 1;
+  string workspace_id = 2;
+  string role = 3;
+}

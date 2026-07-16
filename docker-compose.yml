@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL (Cơ sở dữ liệu chính)
+  postgres:
+    image: postgres:16-alpine
+    container_name: chat-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: chat_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Valkey (Giải pháp thay thế Redis - dùng cho cache và trạng thái online)
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    container_name: chat-valkey
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+
+  # 3. NATS.io (Message Queue & Pub/Sub tốc độ cao, hỗ trợ JetStream)
+  nats:
+    image: nats:2.10-alpine
+    container_name: chat-nats
+    restart: unless-stopped
+    ports:
+      - "4222:4222"   # Client port
+      - "8222:8222"   # HTTP Monitoring port
+    command: ["-js"]  # Kích hoạt JetStream để lưu trữ message stream
+
+  # 4. SeaweedFS (Object Storage thay thế S3, siêu gọn nhẹ)
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: chat-seaweedfs
+    restart: unless-stopped
+    ports:
+      - "9333:9333"   # Master port
+      - "8080:8080"   # Volume port
+      - "8333:8333"   # S3 API port
+    command: "server -dir=/data -s3 -s3.port=8333"
+    volumes:
+      - seaweedfs_data:/data
+
+  # 5. LiveKit (WebRTC SFU Media Server - Tạm thời comment, sẽ mở ở Phase 6)
+  # livekit:
+  #   image: livekit/livekit-server:latest
+  #   container_name: chat-livekit
+  #   restart: unless-stopped
+  #   ports:
+  #     - "7880:7880"        # HTTP API & WebSockets
+  #     - "7881:7881"        # TCP RTC
+  #     - "7882:7882/udp"    # UDP RTC (WebRTC)
+  #   command: --dev --keys "devkey: secret" # Chế độ phát triển, sinh token bằng key/secret này
+  #   environment:
+  #     - LIVEKIT_KEYS=devkey: secret
+
+  # 6. Coturn (STUN/TURN Server - Tạm thời comment, sẽ mở ở Phase 6 khi deploy/test mạng ngoài)
+  # coturn:
+  #   image: coturn/coturn:latest
+  #   container_name: chat-coturn
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3478:3478"
+  #     - "3478:3478/udp"
+  #   # Cấu hình cơ bản cho TURN server chạy dev
+  #   command:
+  #     - -n
+  #     - --lt-cred-mech
+  #     - --fingerprint
+  #     - --no-multicast-peers
+  #     - -a
+  #     - -r=chat-app
+  #     - --user=chatuser:chatpass
+
+volumes:
+  postgres_data:
+  valkey_data:
+  seaweedfs_data:
