@@ -102,39 +102,17 @@ function VoiceChannelItem({
 
 interface TextChannelItemProps {
   chan: Channel;
-  activeWorkspaceId: string | null;
   activeChannelId: string | null;
-  activeVoiceChannelId: string | null;
   unreadChannels: Record<string, number>;
   handleChannelClick: (chan: Channel) => void;
 }
 
 function TextChannelItem({
   chan,
-  activeWorkspaceId,
   activeChannelId,
-  activeVoiceChannelId,
   unreadChannels,
   handleChannelClick,
 }: TextChannelItemProps) {
-  const isUserInThisVoice = activeVoiceChannelId === chan.id;
-
-  // Query active call participants from Go Core API
-  const { data: participants = [] } = useQuery<any[]>({
-    queryKey: ['call-participants', chan.id],
-    queryFn: async () => {
-      if (!chan.id || !activeWorkspaceId) return [];
-      try {
-        const res = await api.get(`/workspaces/${activeWorkspaceId}/channels/${chan.id}/participants`);
-        return res.data;
-      } catch (e) {
-        return [];
-      }
-    },
-    enabled: !!chan.id && !!activeWorkspaceId,
-    refetchInterval: 3000,
-  });
-
   return (
     <div className="flex flex-col gap-0.5 animate-in fade-in duration-255">
       <button
@@ -146,45 +124,17 @@ function TextChannelItem({
         }`}
       >
         <div className="flex items-center gap-2 truncate">
-          {participants.length > 0 ? (
-            <PhoneCall className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-          ) : (
-            <Hash className="w-3.5 h-3.5 text-zinc-500" />
-          )}
-          <span className={`truncate ${unreadChannels[chan.id] > 0 ? 'font-bold text-white' : ''} ${isUserInThisVoice ? 'text-emerald-400 font-semibold' : ''}`}>
+          <Hash className="w-3.5 h-3.5 text-zinc-500" />
+          <span className={`truncate ${unreadChannels[chan.id] > 0 ? 'font-bold text-white' : ''}`}>
             {chan.name}
           </span>
         </div>
-        {unreadChannels[chan.id] > 0 ? (
+        {unreadChannels[chan.id] > 0 && (
           <span className="flex items-center justify-center min-w-[16px] h-[16px] px-1 text-[9px] font-bold text-white bg-rose-500 rounded-full shrink-0">
             {unreadChannels[chan.id]}
           </span>
-        ) : participants.length > 0 ? (
-          <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 animate-pulse font-bold bg-emerald-950/40 border border-emerald-500/10 px-1 rounded shrink-0">
-            <span className="w-1 h-1 rounded-full bg-emerald-400" />
-            {participants.length}
-          </span>
-        ) : null}
+        )}
       </button>
-
-      {/* Render active participants list under text channel name if call is active */}
-      {participants.length > 0 && (
-        <div className="pl-6 pr-2 py-0.5 flex flex-col gap-1 select-none animate-in fade-in slide-in-from-top-1 duration-150">
-          {participants.map((p) => {
-            const initials = p.name ? p.name.substring(0, 2).toUpperCase() : 'U';
-            return (
-              <div key={p.identity} className="flex items-center gap-1.5 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300">
-                <Avatar className="w-4 h-4 border border-zinc-950 shrink-0">
-                  <AvatarFallback className={`text-[6px] font-extrabold ${getAvatarGradient(p.name || '')}`}>
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="truncate max-w-[140px] font-medium leading-none">{p.name || 'Người dùng'}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -704,9 +654,7 @@ export default function ContentExplorer() {
                           <TextChannelItem
                             key={chan.id}
                             chan={chan}
-                            activeWorkspaceId={activeWorkspaceId}
                             activeChannelId={activeChannelId}
-                            activeVoiceChannelId={activeVoiceChannelId}
                             unreadChannels={unreadChannels}
                             handleChannelClick={handleChannelClick}
                           />

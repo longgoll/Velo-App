@@ -571,20 +571,24 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleStartVoiceCall}
-              className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer"
-              title="Bắt đầu cuộc gọi thoại"
-            >
-              <PhoneCall className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleStartVideoCall}
-              className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer"
-              title="Bắt đầu cuộc gọi video"
-            >
-              <Video className="w-4 h-4" />
-            </button>
+            {activeDmChannel && (
+              <>
+                <button
+                  onClick={handleStartVoiceCall}
+                  className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer"
+                  title="Bắt đầu cuộc gọi thoại"
+                >
+                  <PhoneCall className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleStartVideoCall}
+                  className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer"
+                  title="Bắt đầu cuộc gọi video"
+                >
+                  <Video className="w-4 h-4" />
+                </button>
+              </>
+            )}
             <button
               onClick={toggleExplorer}
               className="px-3 py-1 bg-zinc-800/80 text-xs text-zinc-300 rounded-lg hover:bg-zinc-700 hover:text-white transition outline-none border-0 cursor-pointer"

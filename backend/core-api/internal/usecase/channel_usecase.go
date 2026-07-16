@@ -116,6 +116,9 @@ func (u *channelUseCase) GenerateCallToken(userID string, username string, works
 		if channel.WorkspaceID != workspaceID {
 			return "", "", errors.New("channel not found in this workspace")
 		}
+		if channel.Type != domain.ChannelTypeVoice {
+			return "", "", errors.New("cannot start a voice call in a text channel")
+		}
 	}
 
 	// Generate LiveKit Room Access Token
@@ -160,6 +163,9 @@ func (u *channelUseCase) GetCallParticipants(userID string, workspaceID string, 
 	} else {
 		if channel.WorkspaceID != workspaceID {
 			return nil, errors.New("channel not found in this workspace")
+		}
+		if channel.Type != domain.ChannelTypeVoice {
+			return nil, errors.New("participants list is only available for voice channels")
 		}
 	}
 
