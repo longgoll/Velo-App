@@ -20,7 +20,7 @@ pub struct GrpcClients {
 }
 
 impl GrpcClients {
-    pub async fn new(grpc_url: &str) -> Result<Self, tonic::transport::Error> {
+    pub async fn new(grpc_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let channel = Channel::from_shared(grpc_url.to_string())?
             .connect()
             .await?;

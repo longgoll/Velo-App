@@ -4,6 +4,7 @@ use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use tracing::{info, error};
 use dashmap::DashMap;
+use futures_util::StreamExt;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ChatMessage {
@@ -65,7 +66,7 @@ impl QueueManager {
         tokio::spawn(async move {
             let mut stream = pubsub.on_message();
             while let Some(msg) = stream.next().await {
-                let payload: String = match msg.get_payload() {
+                let payload: String = match msg.get_payload::<String>() {
                     Ok(p) => p,
                     Err(e) => {
                         error!("Failed to get Valkey message payload: {:?}", e);

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/o1egl/paseto"
+	"github.com/o1egl/paseto/v2"
 )
 
 type Maker interface {
