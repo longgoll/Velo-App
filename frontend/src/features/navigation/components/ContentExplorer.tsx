@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
-import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe, Bell, Settings, Copy, Link, Check, Share2, PhoneCall, Mic, MicOff, Headphones, PhoneOff, Lock, ChevronUp, VolumeX, Video, Monitor, Rocket, Activity, LogOut } from 'lucide-react';
+import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe, Bell, Settings, Copy, Link, Check, Share2, PhoneCall, Mic, MicOff, Headphones, PhoneOff, Lock, ChevronUp, VolumeX, Video, Monitor, Rocket, Activity, LogOut, UserPlus } from 'lucide-react';
 import api from '@/lib/api';
 import { useVoiceCall } from '@/context/VoiceCallContext';
 import type { Channel, Workspace, DMChannel, WorkspaceMember } from '@/types';
@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getAvatarGradient } from '@/lib/utils';
 import WorkspaceSettingsModal from '@/features/workspace/components/WorkspaceSettingsModal';
 import ChannelSettingsModal from '@/features/workspace/components/ChannelSettingsModal';
+import UserSettingsModal from './UserSettingsModal';
+import WorkspaceInviteModal from './WorkspaceInviteModal';
 import { toast } from '@/store/useToastStore';
 
 // Mock data for Communities
@@ -26,6 +28,7 @@ interface VoiceChannelItemProps {
   handleChannelClick: (chan: Channel) => void;
   isOwnerOrAdmin: boolean;
   onOpenSettings: (chan: Channel) => void;
+  onOpenInvite: () => void;
 }
 
 function VoiceChannelItem({
@@ -36,6 +39,7 @@ function VoiceChannelItem({
   handleChannelClick,
   isOwnerOrAdmin,
   onOpenSettings,
+  onOpenInvite,
 }: VoiceChannelItemProps) {
   const isUserInThisVoice = activeVoiceChannelId === chan.id;
 
@@ -59,7 +63,7 @@ function VoiceChannelItem({
     <div className="flex flex-col gap-0.5 group relative animate-in fade-in duration-255">
       <button
         onClick={() => handleChannelClick(chan)}
-        className={`w-full flex items-center justify-between pl-2 pr-8 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
+        className={`w-full flex items-center justify-between pl-2 pr-12 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
           activeChannelId === chan.id
             ? 'bg-zinc-800/80 text-white'
             : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
@@ -88,18 +92,30 @@ function VoiceChannelItem({
         ) : null}
       </button>
 
-      {isOwnerOrAdmin && (
+      <div className="absolute right-1.5 top-[6px] flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20">
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onOpenSettings(chan);
+            onOpenInvite();
           }}
-          className="absolute right-1.5 top-[7px] p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity duration-150 cursor-pointer z-10"
-          title="Cài đặt kênh"
+          className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white cursor-pointer"
+          title="Mời thành viên vào không gian"
         >
-          <Settings className="w-3 h-3" />
+          <UserPlus className="w-3.5 h-3.5" />
         </button>
-      )}
+        {isOwnerOrAdmin && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenSettings(chan);
+            }}
+            className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white cursor-pointer"
+            title="Cài đặt kênh"
+          >
+            <Settings className="w-3 h-3" />
+          </button>
+        )}
+      </div>
 
       {/* Render active participants list under channel name */}
       {participants.length > 0 && (
@@ -130,6 +146,7 @@ interface TextChannelItemProps {
   handleChannelClick: (chan: Channel) => void;
   isOwnerOrAdmin: boolean;
   onOpenSettings: (chan: Channel) => void;
+  onOpenInvite: () => void;
 }
 
 function TextChannelItem({
@@ -139,12 +156,13 @@ function TextChannelItem({
   handleChannelClick,
   isOwnerOrAdmin,
   onOpenSettings,
+  onOpenInvite,
 }: TextChannelItemProps) {
   return (
     <div className="flex flex-col gap-0.5 animate-in fade-in duration-255 group relative">
       <button
         onClick={() => handleChannelClick(chan)}
-        className={`w-full flex items-center justify-between pl-2 pr-8 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
+        className={`w-full flex items-center justify-between pl-2 pr-12 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
           activeChannelId === chan.id
             ? 'bg-zinc-800/80 text-white shadow-sm'
             : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
@@ -167,18 +185,30 @@ function TextChannelItem({
         )}
       </button>
 
-      {isOwnerOrAdmin && (
+      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20">
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onOpenSettings(chan);
+            onOpenInvite();
           }}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity duration-150 cursor-pointer"
-          title="Cài đặt kênh"
+          className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white cursor-pointer"
+          title="Mời thành viên vào không gian"
         >
-          <Settings className="w-3 h-3" />
+          <UserPlus className="w-3.5 h-3.5" />
         </button>
-      )}
+        {isOwnerOrAdmin && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenSettings(chan);
+            }}
+            className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white cursor-pointer"
+            title="Cài đặt kênh"
+          >
+            <Settings className="w-3 h-3" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -320,6 +350,8 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
   const [dmSearch, setDmSearch] = useState('');
   const [wsDropdownOpen, setWsDropdownOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showUserSettings, setShowUserSettings] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   // Audio Device Toggles and Settings
   const [micDropdownOpen, setMicDropdownOpen] = useState(false);
@@ -806,6 +838,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
                             handleChannelClick={handleChannelClick}
                             isOwnerOrAdmin={isOwnerOrAdmin}
                             onOpenSettings={handleOpenChannelSettings}
+                            onOpenInvite={() => setShowInviteModal(true)}
                           />
                         ))}
                         {textChannels.length === 0 && !isChannelsLoading && (
@@ -851,6 +884,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
                             handleChannelClick={handleChannelClick}
                             isOwnerOrAdmin={isOwnerOrAdmin}
                             onOpenSettings={handleOpenChannelSettings}
+                            onOpenInvite={() => setShowInviteModal(true)}
                           />
                         ))}
                         {voiceChannels.length === 0 && !isChannelsLoading && (
@@ -1267,135 +1301,102 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
       )}
 
       {/* Discord-like User Settings Bar */}
-      <div className="px-3 py-2 bg-zinc-950/90 border-t border-zinc-950/60 flex items-center justify-between select-none">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="relative cursor-pointer hover:opacity-85 transition-opacity">
-            <Avatar className="w-8 h-8 shadow-[0_0_8px_rgba(0,0,0,0.3)]">
-              <AvatarFallback className={`text-[10px] font-bold text-white ${getAvatarGradient(currentUser?.username || '')}`}>
+      <div className="pl-7 pr-3 py-3 bg-zinc-950/90 border-t border-zinc-950/60 flex flex-col gap-2 select-none">
+        {/* Row 1: User Info */}
+        <div className="flex items-center gap-3">
+          <div className="relative cursor-pointer hover:opacity-85 transition-opacity shrink-0">
+            <Avatar className="w-9 h-9 shadow-[0_0_8px_rgba(0,0,0,0.3)]">
+              <AvatarFallback className={`text-xs font-bold text-white ${getAvatarGradient(currentUser?.username || '')}`}>
                 {currentUser?.username ? currentUser.username.slice(0, 2).toUpperCase() : '?'}
               </AvatarFallback>
             </Avatar>
             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 bg-emerald-500 shadow-sm" />
           </div>
           <div className="text-left flex-1 min-w-0">
-            <div className="text-xs font-bold text-zinc-200 truncate leading-tight">
+            <div className="text-sm font-bold text-zinc-200 truncate leading-tight">
               {currentUser?.username || 'Người dùng'}
             </div>
-            <div className="text-[9px] text-zinc-500 font-semibold truncate mt-0.5">
+            <div className="text-[10px] text-zinc-500 font-semibold truncate mt-0.5">
               Trực tuyến
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5 shrink-0 z-10">
-          {/* Microphone control */}
-          <div className="flex items-center bg-zinc-900/40 rounded border border-zinc-900/60">
-            <button
-              onClick={() => setVoiceMuted(!voiceMuted)}
-              className={`p-1.5 rounded-l hover:bg-zinc-800 transition-colors border-0 outline-none cursor-pointer ${
-                voiceMuted ? 'text-rose-500' : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title={voiceMuted ? 'Bật micro' : 'Tắt micro'}
-            >
-              {voiceMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              onClick={() => {
-                setMicDropdownOpen(!micDropdownOpen);
-                setSpeakerDropdownOpen(false);
-              }}
-              className="p-1 hover:bg-zinc-850 text-zinc-500 hover:text-zinc-300 rounded-r border-0 outline-none cursor-pointer flex items-center justify-center h-[26px]"
-            >
-              <ChevronUp className="w-2.5 h-2.5" />
-            </button>
-          </div>
-
-          {/* Speaker control */}
-          <div className="flex items-center bg-zinc-900/40 rounded border border-zinc-900/60 ml-0.5">
-            <button
-              onClick={() => setVoiceDeafened(!voiceDeafened)}
-              className={`p-1.5 rounded-l hover:bg-zinc-800 transition-colors border-0 outline-none cursor-pointer ${
-                voiceDeafened ? 'text-rose-500 animate-pulse' : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title={voiceDeafened ? 'Bật âm thanh' : 'Tắt âm thanh (Deafen)'}
-            >
-              {voiceDeafened ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Headphones className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              onClick={() => {
-                setSpeakerDropdownOpen(!speakerDropdownOpen);
-                setMicDropdownOpen(false);
-              }}
-              className="p-1 hover:bg-zinc-850 text-zinc-500 hover:text-zinc-300 rounded-r border-0 outline-none cursor-pointer flex items-center justify-center h-[26px]"
-            >
-              <ChevronUp className="w-2.5 h-2.5" />
-            </button>
-          </div>
-
-          {/* Quick Settings cog */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors border-0 outline-none cursor-pointer ml-0.5"
-            title="Cài đặt không gian"
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Logout button */}
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="p-1.5 rounded hover:bg-red-950/20 text-zinc-400 hover:text-red-400 transition-colors border-0 outline-none cursor-pointer ml-0.5"
-              title="Đăng xuất"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Share / Active Workspace ID */}
-      {activeWorkspaceId && activeFilter === 'workspaces' && (
-        <div className="px-4 py-2 bg-zinc-950/20 border-t border-zinc-950/60 flex items-center justify-between text-xs text-zinc-455">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Share2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="font-semibold text-zinc-300 truncate" title={activeWs?.name}>
-              {activeWs?.name || 'Không gian'}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {activeWs?.invite_code ? (
-              <>
-                <button
-                  onClick={handleCopyCode}
-                  className="flex items-center gap-1 px-1.5 py-1 hover:bg-zinc-800/80 hover:text-zinc-200 rounded text-[10px] text-zinc-400 transition-colors border-0 cursor-pointer outline-none bg-transparent font-mono font-medium"
-                  title="Sao chép Mã mời"
-                >
-                  {copiedCode ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                  <span>{activeWs.invite_code}</span>
-                </button>
-                <button
-                  onClick={handleCopyLink}
-                  className="p-1 hover:bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 transition-colors border-0 cursor-pointer outline-none bg-transparent rounded"
-                  title="Sao chép Link mời"
-                >
-                  {copiedLink ? <Check className="w-3 h-3 text-emerald-500" /> : <Link className="w-3 h-3" />}
-                </button>
-              </>
-            ) : null}
-
-            {activeWorkspaceId !== activeWs?.invite_code && (
+        {/* Row 2: Controls */}
+        <div className="flex items-center justify-between border-t border-zinc-900/40 pt-2 mt-0.5">
+          <div className="flex items-center gap-1.5">
+            {/* Microphone control */}
+            <div className="flex items-center bg-zinc-900/60 rounded-lg border border-zinc-800/80">
               <button
-                onClick={handleCopyId}
-                className="p-1 hover:bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 transition-colors border-0 cursor-pointer outline-none bg-transparent rounded"
-                title="Sao chép ID không gian"
+                onClick={() => setVoiceMuted(!voiceMuted)}
+                className={`py-1 px-2.5 rounded-l-lg hover:bg-zinc-800 transition-colors border-0 outline-none cursor-pointer flex items-center justify-center ${
+                  voiceMuted ? 'text-rose-500' : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title={voiceMuted ? 'Bật micro' : 'Tắt micro'}
               >
-                {copiedId ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                {voiceMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+              </button>
+              <div className="w-[1px] h-3 bg-zinc-800" />
+              <button
+                onClick={() => {
+                  setMicDropdownOpen(!micDropdownOpen);
+                  setSpeakerDropdownOpen(false);
+                }}
+                className="py-1 px-1.5 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 rounded-r-lg border-0 outline-none cursor-pointer flex items-center justify-center h-[24px]"
+              >
+                <ChevronUp className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Speaker control */}
+            <div className="flex items-center bg-zinc-900/60 rounded-lg border border-zinc-800/80">
+              <button
+                onClick={() => setVoiceDeafened(!voiceDeafened)}
+                className={`py-1 px-2.5 rounded-l-lg hover:bg-zinc-800 transition-colors border-0 outline-none cursor-pointer flex items-center justify-center ${
+                  voiceDeafened ? 'text-rose-500 animate-pulse' : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title={voiceDeafened ? 'Bật âm thanh' : 'Tắt âm thanh (Deafen)'}
+              >
+                {voiceDeafened ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Headphones className="w-3.5 h-3.5" />}
+              </button>
+              <div className="w-[1px] h-3 bg-zinc-800" />
+              <button
+                onClick={() => {
+                  setSpeakerDropdownOpen(!speakerDropdownOpen);
+                  setMicDropdownOpen(false);
+                }}
+                className="py-1 px-1.5 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 rounded-r-lg border-0 outline-none cursor-pointer flex items-center justify-center h-[24px]"
+              >
+                <ChevronUp className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            {/* Quick Settings cog */}
+            <button
+              onClick={() => setShowUserSettings(true)}
+              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors border-0 outline-none cursor-pointer"
+              title="Cài đặt người dùng"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            {/* Logout button */}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="p-1.5 rounded-lg hover:bg-red-950/20 text-zinc-400 hover:text-red-400 transition-colors border-0 outline-none cursor-pointer"
+                title="Đăng xuất"
+              >
+                <LogOut className="w-4 h-4" />
               </button>
             )}
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Workspace Share bar is removed since Invite button is now on each channel list element */}
 
       {activeWorkspaceId && (
         <WorkspaceSettingsModal
@@ -1412,6 +1413,21 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
             if (!open) setSettingsChannel(null);
           }}
           channel={settingsChannel}
+          workspaceId={activeWorkspaceId}
+        />
+      )}
+
+      <UserSettingsModal
+        open={showUserSettings}
+        onOpenChange={setShowUserSettings}
+      />
+
+      {activeWs && activeWorkspaceId && (
+        <WorkspaceInviteModal
+          open={showInviteModal}
+          onOpenChange={setShowInviteModal}
+          workspaceName={activeWs.name}
+          inviteCode={activeWs.invite_code}
           workspaceId={activeWorkspaceId}
         />
       )}

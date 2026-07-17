@@ -88,6 +88,7 @@ export default function WorkspaceSidebar() {
           {/* Top: Global active workspace indicator */}
           <Tooltip>
             <TooltipTrigger
+              className="w-full flex justify-center"
               render={
                 <button 
                   onClick={() => {
@@ -124,6 +125,7 @@ export default function WorkspaceSidebar() {
               return (
                 <Tooltip key={filter.id}>
                   <TooltipTrigger
+                    className="w-full flex justify-center"
                     render={
                       <button
                         onClick={() => setActiveFilter(filter.id)}
