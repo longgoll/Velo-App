@@ -122,6 +122,58 @@ export default function UserSettingsModal({
   const [accentColor, setAccentColor] = useState(() => {
     return localStorage.getItem('accentColor') || 'indigo';
   });
+  const [darkSidebar, setDarkSidebar] = useState(() => {
+    return localStorage.getItem('dark_sidebar') === 'true';
+  });
+  const [autoEmote, setAutoEmote] = useState(() => {
+    return localStorage.getItem('chat_auto_emote') !== 'false';
+  });
+  const [showSendButton, setShowSendButton] = useState(() => {
+    return localStorage.getItem('chat_show_send_button') !== 'false';
+  });
+  const [streamerMode, setStreamerMode] = useState(() => {
+    return localStorage.getItem('user_streamer_mode') === 'true';
+  });
+
+  useEffect(() => {
+    const handleSync = () => {
+      setStreamerMode(localStorage.getItem('user_streamer_mode') === 'true');
+      setAppTheme(localStorage.getItem('theme') || 'dark');
+      setDarkSidebar(localStorage.getItem('dark_sidebar') === 'true');
+      setAccentColor(localStorage.getItem('accentColor') || 'indigo');
+    };
+    window.addEventListener('velo-settings-changed', handleSync);
+    return () => window.removeEventListener('velo-settings-changed', handleSync);
+  }, []);
+
+  const toggleDarkSidebar = (checked: boolean) => {
+    setDarkSidebar(checked);
+    localStorage.setItem('dark_sidebar', String(checked));
+    window.dispatchEvent(new Event('velo-settings-changed'));
+  };
+
+  const toggleAutoEmote = (checked: boolean) => {
+    setAutoEmote(checked);
+    localStorage.setItem('chat_auto_emote', String(checked));
+    window.dispatchEvent(new Event('velo-settings-changed'));
+  };
+
+  const toggleShowSendButton = (checked: boolean) => {
+    setShowSendButton(checked);
+    localStorage.setItem('chat_show_send_button', String(checked));
+    window.dispatchEvent(new Event('velo-settings-changed'));
+  };
+
+  const toggleStreamerMode = (checked: boolean) => {
+    setStreamerMode(checked);
+    localStorage.setItem('user_streamer_mode', String(checked));
+    window.dispatchEvent(new Event('velo-settings-changed'));
+    if (checked) {
+      toast.success('Chế độ Streamer đã được bật!');
+    } else {
+      toast.success('Chế độ Streamer đã được tắt.');
+    }
+  };
 
   // Voice configurations
   const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
@@ -276,16 +328,7 @@ export default function UserSettingsModal({
   const changeTheme = (themeName: string) => {
     setAppTheme(themeName);
     localStorage.setItem('theme', themeName);
-    
-    // Apply changes visually to document element
-    const root = document.documentElement;
-    if (themeName === 'light') {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    } else {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    }
+    window.dispatchEvent(new Event('velo-settings-changed'));
     toast.success(`Đã đổi chủ đề sang: ${themeName === 'light' ? 'Sáng' : themeName === 'midnight' ? 'Midnight' : 'Tối'}`);
   };
 
@@ -293,6 +336,7 @@ export default function UserSettingsModal({
   const changeAccent = (color: string) => {
     setAccentColor(color);
     localStorage.setItem('accentColor', color);
+    window.dispatchEvent(new Event('velo-settings-changed'));
     toast.success(`Đã đổi màu chủ đạo sang: ${color}`);
   };
 
@@ -511,7 +555,9 @@ export default function UserSettingsModal({
                           </Button>
                         </div>
                       ) : (
-                        <div className="text-sm font-semibold text-white">{currentUser?.username || 'Người dùng'}</div>
+                        <div className="text-sm font-semibold text-white">
+                          {streamerMode ? '• • • • • • • • • •' : (currentUser?.username || 'Người dùng')}
+                        </div>
                       )}
                     </div>
                     {editingField !== 'username' && (
@@ -521,7 +567,8 @@ export default function UserSettingsModal({
                           setUsernameVal(currentUser?.username || '');
                           setEditingField('username');
                         }}
-                        className="bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border-0"
+                        disabled={streamerMode}
+                        className="bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border-0 disabled:opacity-50"
                       >
                         Chỉnh sửa
                       </Button>
@@ -549,13 +596,22 @@ export default function UserSettingsModal({
                         </div>
                       ) : (
                         <div className="text-sm font-semibold text-white flex items-center gap-2">
-                          <span>{showEmail ? (currentUser?.email || 'Chưa thiết lập') : getObfuscatedEmail(currentUser?.email || '')}</span>
-                          <button 
-                            onClick={() => setShowEmail(!showEmail)}
-                            className="text-[10px] font-bold text-indigo-400 hover:text-indigo-355 cursor-pointer border-0 bg-transparent p-0"
-                          >
-                            {showEmail ? 'Ẩn' : 'Hiển thị'}
-                          </button>
+                          <span>
+                            {streamerMode 
+                              ? '• • • • • • • • • •' 
+                              : showEmail 
+                                ? (currentUser?.email || 'Chưa thiết lập') 
+                                : getObfuscatedEmail(currentUser?.email || '')
+                            }
+                          </span>
+                          {!streamerMode && (
+                            <button 
+                              onClick={() => setShowEmail(!showEmail)}
+                              className="text-[10px] font-bold text-indigo-400 hover:text-indigo-355 cursor-pointer border-0 bg-transparent p-0"
+                            >
+                              {showEmail ? 'Ẩn' : 'Hiển thị'}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -566,7 +622,8 @@ export default function UserSettingsModal({
                           setEmailVal(currentUser?.email || '');
                           setEditingField('email');
                         }}
-                        className="bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border-0"
+                        disabled={streamerMode}
+                        className="bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border-0 disabled:opacity-50"
                       >
                         Chỉnh sửa
                       </Button>
@@ -594,13 +651,22 @@ export default function UserSettingsModal({
                         </div>
                       ) : (
                         <div className="text-sm font-semibold text-white flex items-center gap-2">
-                          <span>{showPhone ? phoneVal : getObfuscatedPhone(phoneVal)}</span>
-                          <button 
-                            onClick={() => setShowPhone(!showPhone)}
-                            className="text-[10px] font-bold text-indigo-400 hover:text-indigo-355 cursor-pointer border-0 bg-transparent p-0"
-                          >
-                            {showPhone ? 'Ẩn' : 'Hiển thị'}
-                          </button>
+                          <span>
+                            {streamerMode 
+                              ? '• • • • • • • • • •' 
+                              : showPhone 
+                                ? phoneVal 
+                                : getObfuscatedPhone(phoneVal)
+                            }
+                          </span>
+                          {!streamerMode && (
+                            <button 
+                              onClick={() => setShowPhone(!showPhone)}
+                              className="text-[10px] font-bold text-indigo-400 hover:text-indigo-355 cursor-pointer border-0 bg-transparent p-0"
+                            >
+                              {showPhone ? 'Ẩn' : 'Hiển thị'}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -610,7 +676,8 @@ export default function UserSettingsModal({
                         onClick={() => {
                           setEditingField('phone');
                         }}
-                        className="bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border-0"
+                        disabled={streamerMode}
+                        className="bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border-0 disabled:opacity-50"
                       >
                         Chỉnh sửa
                       </Button>
@@ -846,7 +913,7 @@ export default function UserSettingsModal({
                                   <span className="text-[8px] font-bold text-indigo-400 bg-indigo-950/60 border border-indigo-500/10 px-1.5 py-0.5 rounded">Hiện tại</span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-zinc-500 mt-0.5">{device.location} • {device.time}</div>
+                              <div className="text-[10px] text-zinc-500 mt-0.5">{streamerMode ? '• • • • • • • •' : `${device.location} • ${device.time}`}</div>
                             </div>
                           </div>
 
@@ -1028,7 +1095,7 @@ export default function UserSettingsModal({
                     <div className="mt-3 bg-zinc-900 border border-zinc-800/40 rounded-xl p-3 space-y-2">
                       <div>
                         <div className="text-sm font-bold text-white">{currentUser?.username || 'Người dùng'}</div>
-                        <div className="text-[10px] text-zinc-500 font-mono mt-0.5">ID: {currentUser?.id?.slice(0, 10) || '12345678'}...</div>
+                        <div className="text-[10px] text-zinc-500 font-mono mt-0.5">ID: {streamerMode ? '• • • • • • • •' : (currentUser?.id?.slice(0, 10) || '12345678') + '...'}</div>
                       </div>
                       <div className="border-t border-zinc-800/60 pt-2 text-[10.5px] text-zinc-400 leading-relaxed italic">
                         "Phong cách sống và trò chuyện đỉnh cao trên hệ thống Velo."
@@ -1045,15 +1112,15 @@ export default function UserSettingsModal({
           {activeTab === 'appearance' && (
             <div className="space-y-8 pb-10">
               <div>
-                <h3 className="text-xl font-bold text-white">Giao diện</h3>
-                <p className="text-xs text-zinc-400 mt-1">Thay đổi chủ đề hiển thị và màu sắc chủ đạo của ứng dụng.</p>
+                <h3 className="text-xl font-bold text-white">Giao diện & Hiển thị</h3>
+                <p className="text-xs text-zinc-400 mt-1">Thay đổi chủ đề hiển thị, màu sắc chủ đạo và cấu hình trò chuyện của ứng dụng.</p>
               </div>
 
               {/* Theme Customizer Card */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-6 text-left">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-300">Chủ đề ứng dụng</label>
-                  <p className="text-[11px] text-zinc-400">Chọn phong cách sáng/tối phù hợp với thị giác của bạn.</p>
+                  <label className="text-xs font-bold text-zinc-300">Chủ đề ứng dụng (Background)</label>
+                  <p className="text-[11px] text-zinc-400">Chọn phong cách chủ đề phù hợp với thị giác của bạn.</p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3.5">
@@ -1088,7 +1155,7 @@ export default function UserSettingsModal({
                         <div className="h-1.5 w-10 bg-zinc-900 rounded" />
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-white text-center w-full block">Midnight (OLED)</span>
+                    <span className="text-xs font-bold text-white text-center w-full block">Midnight (OLED Black)</span>
                   </button>
 
                   {/* Theme item: Sáng */}
@@ -1108,6 +1175,17 @@ export default function UserSettingsModal({
                     <span className="text-xs font-bold text-zinc-800 text-center w-full block">Chế độ Sáng (Light)</span>
                   </button>
                 </div>
+
+                {/* Dark Sidebar option (visible if light theme) */}
+                {appTheme === 'light' && (
+                  <div className="border-t border-zinc-850 pt-5 flex items-center justify-between animate-in fade-in duration-200">
+                    <div className="space-y-0.5">
+                      <label className="text-xs font-bold text-zinc-300">Thanh bên tối màu (Dark Sidebar)</label>
+                      <p className="text-[11px] text-zinc-400">Giữ cho thanh bên trái luôn ở chế độ tối ngay cả khi đang dùng chủ đề Sáng.</p>
+                    </div>
+                    <ToggleSwitch checked={darkSidebar} onChange={toggleDarkSidebar} />
+                  </div>
+                )}
               </div>
 
               {/* Accent Color Selection */}
@@ -1135,6 +1213,52 @@ export default function UserSettingsModal({
                       <span className="text-xs">{color.name}</span>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Message & Chat Settings */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-6 text-left">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-300">Tin nhắn & Khung chat</label>
+                  <p className="text-[11px] text-zinc-400">Cấu hình hành vi hiển thị và tương tác của khung nhập tin nhắn.</p>
+                </div>
+
+                <div className="space-y-5">
+                  {/* Auto Emote transformation */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-white">Tự động chuyển đổi ký tự thành Emoji</div>
+                      <p className="text-[11px] text-zinc-450">Tự động biến đổi các ký tự cảm xúc như <code>:)</code> thành <code>🙂</code> khi gõ tin nhắn.</p>
+                    </div>
+                    <ToggleSwitch checked={autoEmote} onChange={toggleAutoEmote} />
+                  </div>
+
+                  {/* Show send button */}
+                  <div className="border-t border-zinc-850 pt-5 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-white">Hiển thị nút Gửi tin nhắn</div>
+                      <p className="text-[11px] text-zinc-450">Hiển thị nút Gửi dạng icon mũi tên bên cạnh ô nhập tin nhắn trong khung chat.</p>
+                    </div>
+                    <ToggleSwitch checked={showSendButton} onChange={toggleShowSendButton} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Streamer Mode setting */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-6 text-left">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 max-w-md">
+                    <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                      Chế độ Streamer (Streamer Mode)
+                      {streamerMode && (
+                        <span className="text-[8px] bg-indigo-950 border border-indigo-900 text-indigo-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">ĐANG BẬT</span>
+                      )}
+                    </label>
+                    <p className="text-[11.5px] text-zinc-455 leading-relaxed">
+                      Bảo vệ quyền riêng tư bằng cách tự động che giấu Email, Số điện thoại, ID người dùng và ngắt các thiết bị liên kết khi chia sẻ màn hình.
+                    </p>
+                  </div>
+                  <ToggleSwitch checked={streamerMode} onChange={toggleStreamerMode} />
                 </div>
               </div>
             </div>

@@ -161,3 +161,681 @@ body {
     @apply font-sans;
   }
 }
+
+/* Theme Custom Variables and Overrides */
+:root {
+  --bg-app-sidebar: #f2f3f5;
+  --bg-app-chat: #ffffff;
+  --text-app-primary: #060607;
+  --text-app-secondary: #4e5058;
+  --border-app: #e3e5e8;
+}
+
+.dark {
+  --bg-app-sidebar: #1e1f22;
+  --bg-app-chat: #313338;
+  --text-app-primary: #f2f3f5;
+  --text-app-secondary: #949ba4;
+  --border-app: #2b2d31;
+}
+
+.midnight {
+  --bg-app-sidebar: #000000;
+  --bg-app-chat: #09090b;
+  --text-app-primary: #ffffff;
+  --text-app-secondary: #a1a1aa;
+  --border-app: #18181b;
+}
+
+/* Custom theme mapping selectors to prevent editing multiple react components */
+.light body,
+.light #root {
+  background-color: var(--bg-app-chat);
+  color: var(--text-app-primary);
+}
+
+/* Global Light Mode Zinc Utility Overrides */
+.light .bg-zinc-950 {
+  background-color: #ffffff !important;
+}
+.light .bg-zinc-900 {
+  background-color: #f2f3f5 !important;
+}
+.light .bg-zinc-900\/90 {
+  background-color: #f2f3f5 !important;
+}
+.light .bg-zinc-900\/40 {
+  background-color: #ffffff !important;
+}
+.light .bg-zinc-950\/40 {
+  background-color: #f2f3f5 !important;
+}
+.light .bg-zinc-950\/90 {
+  background-color: #e3e5e8 !important;
+}
+.light .bg-zinc-800 {
+  background-color: #e3e5e8 !important;
+}
+.light .bg-zinc-800\/80 {
+  background-color: #e3e5e8 !important;
+}
+.light .bg-zinc-850 {
+  background-color: #d1d3d6 !important;
+}
+.light .bg-zinc-700 {
+  background-color: #d1d3d6 !important;
+}
+.light .bg-zinc-750 {
+  background-color: #d1d3d6 !important;
+}
+
+/* Borders */
+.light .border-zinc-850,
+.light .border-zinc-800,
+.light .border-zinc-900,
+.light .border-zinc-950,
+.light .border-zinc-800\/30,
+.light .border-zinc-800\/40,
+.light .border-zinc-800\/60,
+.light .border-zinc-900\/50,
+.light .border-zinc-950\/40,
+.light .border-zinc-950\/80,
+.light .border-b {
+  border-color: #e3e5e8 !important;
+}
+
+/* Texts */
+.light .text-white,
+.light .text-zinc-100,
+.light .text-zinc-250 {
+  color: #060607 !important;
+}
+.light .text-zinc-200,
+.light .text-zinc-300 {
+  color: #313338 !important;
+}
+.light .text-zinc-400,
+.light .text-zinc-450,
+.light .text-zinc-500,
+.light .text-zinc-550,
+.light .text-zinc-650 {
+  color: #4e5058 !important;
+}
+
+/* Specific elements that need clear light modes */
+.light div.w-\[64px\] {
+  background-color: var(--bg-app-sidebar) !important;
+  border-right-color: var(--border-app) !important;
+}
+.light div.w-\[240px\] {
+  background-color: var(--bg-app-sidebar) !important;
+  border-right-color: var(--border-app) !important;
+}
+.light .no-scrollbar {
+  background-color: var(--bg-app-chat) !important;
+}
+.light .hover\:bg-zinc-900\/30:hover {
+  background-color: rgba(0, 0, 0, 0.02) !important;
+}
+.light form.bg-zinc-900 {
+  background-color: #ebedf0 !important;
+  border-color: #e3e5e8 !important;
+}
+.light form.bg-zinc-900 input {
+  color: #111827 !important;
+}
+.light form.bg-zinc-900 input::placeholder {
+  color: #747f8d !important;
+}
+
+/* --- Dark Sidebar Overrides inside Light Theme --- */
+.light.dark-sidebar div.w-\[64px\] {
+  background-color: #111214 !important;
+  border-right-color: #1e1f22 !important;
+}
+.light.dark-sidebar div.w-\[240px\] {
+  background-color: #2b2d31 !important;
+  border-right-color: #1f2023 !important;
+}
+.light.dark-sidebar div.w-\[240px\] h1,
+.light.dark-sidebar div.w-\[240px\] .text-white {
+  color: #f2f3f5 !important;
+}
+.light.dark-sidebar div.w-\[240px\] .bg-zinc-950\/90 {
+  background-color: #232428 !important;
+  border-top-color: #1f2023 !important;
+}
+.light.dark-sidebar div.w-\[240px\] .bg-zinc-950\/90 .text-zinc-200 {
+  color: #f2f3f5 !important;
+}
+.light.dark-sidebar div.w-\[240px\] button {
+  color: #949ba4 !important;
+}
+.light.dark-sidebar div.w-\[240px\] button:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #f2f3f5 !important;
+}
+.light.dark-sidebar div.w-\[240px\] button.bg-zinc-800\/80 {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #f2f3f5 !important;
+}
+
+/* --- Midnight Theme Overrides --- */
+.midnight body,
+.midnight #root {
+  background-color: var(--bg-app-chat);
+  color: var(--text-app-primary);
+}
+
+.midnight div.w-\[64px\] {
+  background-color: #000000 !important;
+  border-right-color: #18181b !important;
+}
+
+.midnight div.w-\[240px\] {
+  background-color: #000000 !important;
+  border-right-color: #18181b !important;
+}
+
+.midnight div.w-\[240px\] .bg-zinc-950\/90 {
+  background-color: #050505 !important;
+  border-top-color: #18181b !important;
+}
+
+.midnight div.flex-1.bg-zinc-900 {
+  background-color: #09090b !important;
+}
+
+.midnight div.flex-1.bg-zinc-900 .bg-zinc-900\/40 {
+  background-color: #000000 !important;
+  border-bottom-color: #18181b !important;
+}
+
+.midnight form.bg-zinc-900 {
+  background-color: #000000 !important;
+  border-color: #18181b !important;
+}
+
+/* --- Accent Color Variables mapping onto Tailwind Indigo utility --- */
+.accent-indigo {
+  --color-indigo-400: #818cf8;
+  --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5;
+  --color-indigo-700: #4338ca;
+}
+.accent-emerald {
+  --color-indigo-400: #34d399;
+  --color-indigo-500: #10b981;
+  --color-indigo-600: #059669;
+  --color-indigo-700: #047857;
+}
+.accent-rose {
+  --color-indigo-400: #f43f5e;
+  --color-indigo-500: #e11d48;
+  --color-indigo-600: #be123c;
+  --color-indigo-700: #9f1239;
+}
+.accent-violet {
+  --color-indigo-400: #a78bfa;
+  --color-indigo-500: #8b5cf6;
+  --color-indigo-600: #7c3aed;
+  --color-indigo-700: #6d28d9;
+}
+
+/* --- Light Mode Settings Modal Overrides --- */
+.light [role="dialog"] {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+  color: #313338 !important;
+}
+
+/* Outer dialog container inside DialogContent component */
+.light div.sm\:max-w-4xl {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+  color: #313338 !important;
+}
+
+/* Left sidebar of settings modal */
+.light div.sm\:max-w-4xl div.w-\[240px\] {
+  background-color: #f2f3f5 !important;
+  border-right-color: #e3e5e8 !important;
+}
+
+/* Profile card in sidebar */
+.light div.sm\:max-w-4xl div.w-\[240px\] .bg-zinc-950\/40 {
+  background-color: #e3e5e8 !important;
+  border-color: #d1d3d6 !important;
+}
+.light div.sm\:max-w-4xl div.w-\[240px\] .bg-zinc-950\/40 .text-white {
+  color: #060607 !important;
+}
+
+/* Search input in sidebar */
+.light div.sm\:max-w-4xl div.w-\[240px\] input {
+  background-color: #e3e5e8 !important;
+  border-color: #d1d3d6 !important;
+  color: #060607 !important;
+}
+.light div.sm\:max-w-4xl div.w-\[240px\] input::placeholder {
+  color: #4e5058 !important;
+}
+
+/* Sidebar category headers */
+.light div.sm\:max-w-4xl div.w-\[240px\] .text-zinc-500 {
+  color: #4e5058 !important;
+}
+
+/* Tab button hover / active states */
+.light div.sm\:max-w-4xl div.w-\[240px\] button.bg-zinc-800 {
+  background-color: #e3e5e8 !important;
+  color: #060607 !important;
+}
+.light div.sm\:max-w-4xl div.w-\[240px\] button.text-zinc-400 {
+  color: #4e5058 !important;
+}
+.light div.sm\:max-w-4xl div.w-\[240px\] button.text-zinc-400:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: #060607 !important;
+}
+
+/* Right Scrollable Content Area */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 {
+  background-color: #ffffff !important;
+}
+
+/* Titles and subtitles on the right side */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 h3.text-white {
+  color: #060607 !important;
+}
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 p.text-zinc-400 {
+  color: #4e5058 !important;
+}
+
+/* Sub-cards on the right side (bg-zinc-900) */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .bg-zinc-900,
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .bg-zinc-900\/80 {
+  background-color: #f2f3f5 !important;
+  border-color: #e3e5e8 !important;
+}
+
+/* Section titles inside cards */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .text-zinc-400.uppercase {
+  color: #4e5058 !important;
+}
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .text-zinc-300 {
+  color: #060607 !important;
+}
+
+/* Row borders */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .border-zinc-800\/30,
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .border-b {
+  border-color: #e3e5e8 !important;
+}
+
+/* Field values text colors */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .text-white {
+  color: #060607 !important;
+}
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .text-zinc-200 {
+  color: #060607 !important;
+}
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .text-zinc-400 {
+  color: #4e5058 !important;
+}
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .text-zinc-450 {
+  color: #4e5058 !important;
+}
+
+/* Form inputs on edit */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 input.bg-zinc-950 {
+  background-color: #ffffff !important;
+  border-color: #d1d3d6 !important;
+  color: #060607 !important;
+}
+
+/* Settings buttons (bg-zinc-800) */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 button.bg-zinc-800 {
+  background-color: #e3e5e8 !important;
+  color: #313338 !important;
+}
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 button.bg-zinc-800:hover {
+  background-color: #d1d3d6 !important;
+}
+
+/* Inner card sub-sections (bg-zinc-950) */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .bg-zinc-950 {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+}
+
+/* Profile preview live card inside tab: Profile */
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .w-\[260px\]\.bg-zinc-950 {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+}
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .w-\[260px\]\.bg-zinc-950 .bg-zinc-900 {
+  background-color: #f2f3f5 !important;
+  border-color: #e3e5e8 !important;
+}
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .w-\[260px\] {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+}
+.light div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .w-\[260px\] div.bg-zinc-900 {
+  background-color: #f2f3f5 !important;
+  border-color: #e3e5e8 !important;
+}
+
+/* Close ESC Button */
+.light div.sm\:max-w-4xl button .bg-zinc-900 {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+  color: #4e5058 !important;
+}
+.light div.sm\:max-w-4xl button:hover .bg-zinc-900 {
+  background-color: #f2f3f5 !important;
+  color: #060607 !important;
+}
+
+/* --- Midnight Mode Settings Modal Overrides --- */
+.midnight [role="dialog"],
+.midnight div.sm\:max-w-4xl {
+  background-color: #000000 !important;
+  border-color: #18181b !important;
+}
+.midnight div.sm\:max-w-4xl div.w-\[240px\] {
+  background-color: #000000 !important;
+  border-right-color: #18181b !important;
+}
+.midnight div.sm\:max-w-4xl div.flex-1.bg-zinc-950 {
+  background-color: #000000 !important;
+}
+.midnight div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .bg-zinc-900 {
+  background-color: #050505 !important;
+  border-color: #18181b !important;
+}
+.midnight div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .bg-zinc-950 {
+  background-color: #000000 !important;
+  border-color: #18181b !important;
+}
+.midnight div.sm\:max-w-4xl div.flex-1.bg-zinc-950 .bg-zinc-900\/80 {
+  background-color: #050505 !important;
+  border-color: #18181b !important;
+}
+.midnight div.sm\:max-w-4xl div.w-\[240px\] .bg-zinc-950\/40 {
+  background-color: #050505 !important;
+  border-color: #18181b !important;
+}
+.midnight div.sm\:max-w-4xl div.w-\[240px\] input {
+  background-color: #050505 !important;
+  border-color: #18181b !important;
+}
+.midnight div.sm\:max-w-4xl button .bg-zinc-900 {
+  background-color: #000000 !important;
+  border-color: #18181b !important;
+}
+.midnight div.sm\:max-w-4xl button:hover .bg-zinc-900 {
+  background-color: #09090b !important;
+}
+
+/* --- Light Mode UI/UX Colors & Hover State Overrides --- */
+
+/* 1. Global hover state colors overrides in Light Mode */
+.light .hover\:bg-zinc-900:hover,
+.light .hover\:bg-zinc-900\/30:hover,
+.light .hover\:bg-zinc-900\/50:hover,
+.light .hover\:bg-zinc-850:hover,
+.light .hover\:bg-zinc-800:hover,
+.light .hover\:bg-zinc-800\/30:hover,
+.light .hover\:bg-zinc-700:hover,
+.light .hover\:bg-zinc-700\/30:hover,
+.light .hover\:bg-zinc-750:hover,
+.light .hover\:bg-zinc-950:hover,
+.light .hover\:bg-zinc-950\/40:hover,
+.light .hover\:bg-zinc-950\/90:hover {
+  background-color: #e3e5e8 !important;
+}
+
+.light .hover\:text-zinc-200:hover,
+.light .hover\:text-zinc-300:hover,
+.light .hover\:text-white:hover {
+  color: #060607 !important;
+}
+
+.light .hover\:text-zinc-400:hover,
+.light .hover\:text-zinc-450:hover,
+.light .hover\:text-zinc-500:hover {
+  color: #313338 !important;
+}
+
+/* 2. User Profile Settings Panel (Sidebar bottom) overrides */
+.light .bg-zinc-950\/90 div.flex.items-center.bg-zinc-900\/60 {
+  background-color: #ffffff !important;
+  border-color: #d1d3d6 !important;
+}
+.light .bg-zinc-950\/90 div.flex.items-center.bg-zinc-900\/60 button {
+  color: #4e5058 !important;
+}
+.light .bg-zinc-950\/90 div.flex.items-center.bg-zinc-900\/60 button:hover {
+  background-color: #f2f3f5 !important;
+  color: #060607 !important;
+}
+.light .bg-zinc-950\/90 div.flex.items-center.bg-zinc-900\/60 button.text-rose-500 {
+  color: #ef4444 !important;
+}
+.light .bg-zinc-950\/90 div.flex.items-center.bg-zinc-900\/60 div.bg-zinc-800 {
+  background-color: #d1d3d6 !important;
+}
+.light .bg-zinc-950\/90 div.flex.items-center.bg-zinc-900\/60 div {
+  background-color: #d1d3d6 !important;
+}
+.light .bg-zinc-950\/90 .border-zinc-900\/40 {
+  border-color: #d1d3d6 !important;
+}
+.light .bg-zinc-950\/90 button.hover\:bg-zinc-800:hover {
+  background-color: #ffffff !important;
+  color: #060607 !important;
+}
+.light .bg-zinc-950\/90 button.hover\:bg-red-950\/20:hover {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  color: #ef4444 !important;
+}
+
+/* 3. Chat Input Action Buttons & Emoji overrides */
+.light form.bg-zinc-900 button.hover\:bg-zinc-800:hover {
+  background-color: #d1d3d6 !important;
+  color: #060607 !important;
+}
+.light form.bg-zinc-900 button.bg-zinc-800 {
+  background-color: #d1d3d6 !important;
+  color: #060607 !important;
+}
+.light div.absolute.bg-zinc-950 button.hover\:bg-zinc-800:hover {
+  background-color: #e3e5e8 !important;
+}
+
+/* 4. Mention Auto-complete Popover overrides */
+.light .bg-zinc-950\/95 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e3e5e8 !important;
+}
+.light .bg-zinc-950\/95 .border-zinc-900\/50 {
+  border-color: #f2f3f5 !important;
+}
+.light .bg-zinc-950\/95 div.cursor-pointer {
+  color: #313338 !important;
+}
+.light .bg-zinc-950\/95 div.cursor-pointer.bg-zinc-800\/80 {
+  background-color: #f2f3f5 !important;
+  color: #060607 !important;
+}
+.light .bg-zinc-950\/95 div.cursor-pointer:hover {
+  background-color: #f2f3f5 !important;
+  color: #060607 !important;
+}
+.light .bg-zinc-950\/95 .text-zinc-500 {
+  color: #747f8d !important;
+}
+.light .bg-zinc-950\/95 .text-zinc-300 {
+  color: #313338 !important;
+}
+.light .bg-zinc-950\/95 .bg-zinc-900 {
+  background-color: #f2f3f5 !important;
+  color: #4e5058 !important;
+}
+.light .bg-zinc-950\/95 .border-zinc-850 {
+  border-color: #e3e5e8 !important;
+}
+
+/* 5. Call Log Message Card styling overrides */
+.light div.bg-zinc-950\/50.border-zinc-800\/80 {
+  background-color: #f2f3f5 !important;
+  border-color: #e3e5e8 !important;
+}
+.light div.bg-zinc-950\/50.border-zinc-800\/80 .bg-zinc-900 {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+}
+.light div.bg-zinc-950\/50.border-zinc-800\/80 .text-zinc-450 {
+  color: #4e5058 !important;
+}
+.light div.bg-zinc-950\/50.border-zinc-800\/80 button.bg-zinc-850 {
+  background-color: #ffffff !important;
+  border-color: #d1d3d6 !important;
+  color: #313338 !important;
+}
+.light div.bg-zinc-950\/50.border-zinc-800\/80 button.bg-zinc-850:hover {
+  background-color: #e3e5e8 !important;
+  color: #060607 !important;
+}
+.light .bg-emerald-500\/10 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  color: #047857 !important;
+}
+
+/* 6. Active Call Banner at top of chat feed */
+.light .bg-emerald-950\/20 {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+
+/* 7. Active Call Interfaces (DMCallRoomView & VoiceRoomView) overrides */
+.light div.bg-zinc-950\/60.backdrop-blur-md.border-zinc-800\/80 {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+}
+.light div.bg-zinc-950\/65.backdrop-blur-md.border-zinc-800\/80 {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+}
+.light div.bg-zinc-950.flex.flex-col.justify-between.h-full {
+  background-color: #ffffff !important;
+}
+.light .bg-zinc-955\/20,
+.light .bg-zinc-950\/20,
+.light .bg-zinc-950\/70,
+.light .bg-zinc-950\/30,
+.light .bg-zinc-950\/80 {
+  background-color: #f2f3f5 !important;
+  border-color: #e3e5e8 !important;
+}
+.light .bg-zinc-905\/40,
+.light .bg-zinc-900\/40 {
+  background-color: #f2f3f5 !important;
+  border-color: #e3e5e8 !important;
+}
+.light button.bg-zinc-900 {
+  background-color: #ffffff !important;
+  border-color: #d1d3d6 !important;
+  color: #313338 !important;
+}
+.light button.bg-zinc-900:hover {
+  background-color: #f2f3f5 !important;
+  color: #060607 !important;
+}
+.light button.bg-rose-950\/40 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #ef4444 !important;
+}
+.light button.bg-rose-950\/40:hover {
+  background-color: rgba(239, 68, 68, 0.25) !important;
+}
+.light button.bg-rose-650 {
+  background-color: #ef4444 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+.light button.bg-emerald-650 {
+  background-color: #10b981 !important;
+  border-color: #059669 !important;
+  color: #ffffff !important;
+}
+.light div.bg-zinc-955\/70,
+.light div.bg-zinc-950\/70,
+.light div.bg-zinc-950\/80 {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: #e3e5e8 !important;
+  color: #060607 !important;
+}
+.light div.bg-zinc-900\/30.backdrop-blur-xl.border-zinc-800\/60 {
+  background-color: #f2f3f5 !important;
+  border-color: #e3e5e8 !important;
+}
+.light div.bg-zinc-900\/30.backdrop-blur-xl.border-zinc-800\/60 h3 {
+  color: #060607 !important;
+}
+.light div.bg-zinc-900\/30.backdrop-blur-xl.border-zinc-800\/60 p {
+  color: #4e5058 !important;
+}
+.light .border-zinc-900\/60 {
+  border-color: #e3e5e8 !important;
+}
+
+/* 8. Incoming Call Dialog Light Mode styling */
+.light div.bg-zinc-950\/80.backdrop-blur-2xl.border-zinc-800\/80 {
+  background-color: #ffffff !important;
+  border-color: #e3e5e8 !important;
+  color: #313338 !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important;
+}
+.light div.bg-zinc-950\/80.backdrop-blur-2xl.border-zinc-800\/80 h3 {
+  color: #060607 !important;
+}
+.light div.bg-zinc-950\/80.backdrop-blur-2xl.border-zinc-800\/80 .text-zinc-500 {
+  color: #747f8d !important;
+}
+
+/* --- Color Scheme and Scrollbar overrides --- */
+.light {
+  color-scheme: light !important;
+}
+
+/* Custom premium scrollbar styling across all themes */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.45);
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12) !important;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25) !important;
+}

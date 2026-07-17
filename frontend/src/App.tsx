@@ -34,6 +34,56 @@ export default function App() {
 
   const queryClient = useQueryClient();
 
+  const [isStreamerMode, setIsStreamerMode] = useState(false);
+
+  const applySettings = () => {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    const savedDarkSidebar = localStorage.getItem('dark_sidebar') === 'true';
+    const savedAccentColor = localStorage.getItem('accentColor') || 'indigo';
+    const savedStreamerMode = localStorage.getItem('user_streamer_mode') === 'true';
+
+    setIsStreamerMode(savedStreamerMode);
+
+    const root = document.documentElement;
+
+    // Theme class
+    root.classList.remove('light', 'dark', 'midnight');
+    if (savedTheme === 'light') {
+      root.classList.add('light');
+    } else if (savedTheme === 'midnight') {
+      root.classList.add('midnight');
+    } else {
+      root.classList.add('dark');
+    }
+
+    // Dark Sidebar class
+    if (savedDarkSidebar) {
+      root.classList.add('dark-sidebar');
+    } else {
+      root.classList.remove('dark-sidebar');
+    }
+
+    // Accent Color class
+    root.classList.remove('accent-indigo', 'accent-emerald', 'accent-rose', 'accent-violet');
+    root.classList.add(`accent-${savedAccentColor}`);
+  };
+
+  useEffect(() => {
+    applySettings();
+    window.addEventListener('velo-settings-changed', applySettings);
+    window.addEventListener('storage', applySettings);
+    return () => {
+      window.removeEventListener('velo-settings-changed', applySettings);
+      window.removeEventListener('storage', applySettings);
+    };
+  }, []);
+
+  const handleDisableStreamerMode = () => {
+    localStorage.setItem('user_streamer_mode', 'false');
+    window.dispatchEvent(new Event('velo-settings-changed'));
+    toast.success('Đã tắt chế độ Streamer.');
+  };
+
   // WebSocket connection
   const { sendMessage, sendTyping } = useWebSocket(token);
 
@@ -102,28 +152,47 @@ export default function App() {
 
   return (
     <VoiceCallProvider>
-      <div className="flex h-screen bg-zinc-950 text-zinc-200 select-none overflow-hidden">
-        {/* 1. Slim Left Navigation Sidebar */}
-        <WorkspaceSidebar />
+      <div className="flex flex-col h-screen select-none overflow-hidden bg-zinc-950 text-zinc-200">
+        {/* Streamer Mode active warning banner */}
+        {isStreamerMode && (
+          <div className="bg-indigo-600 text-white text-[11.5px] py-2 px-4 flex items-center justify-between z-50 shadow-md animate-in slide-in-from-top duration-200 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+              <span className="font-bold uppercase tracking-wider">Chế độ Streamer đang hoạt động</span>
+              <span className="opacity-80">— Các thông tin cá nhân nhạy cảm đã được ẩn tự động để bảo vệ quyền riêng tư của bạn.</span>
+            </div>
+            <button 
+              onClick={handleDisableStreamerMode}
+              className="bg-zinc-900/60 hover:bg-zinc-900/80 text-white text-[10px] font-bold px-2 py-1 rounded transition border-0 cursor-pointer outline-none"
+            >
+              Tắt chế độ Streamer
+            </button>
+          </div>
+        )}
 
-        {/* 2. Fluid Content Explorer Sidebar */}
-        <ContentExplorer onLogout={handleLogout} />
+        <div className="flex flex-1 h-full overflow-hidden">
+          {/* 1. Slim Left Navigation Sidebar */}
+          <WorkspaceSidebar />
 
-        {/* 3. Main Chat Viewport */}
-        <ChatViewport onSendMessage={sendMessage} onSendTyping={sendTyping} />
+          {/* 2. Fluid Content Explorer Sidebar */}
+          <ContentExplorer onLogout={handleLogout} />
 
-        {/* --- Dialog / Modals --- */}
-        <CreateWorkspaceModal open={showCreateWs} onOpenChange={setShowCreateWs} />
-        <JoinWorkspaceModal open={showJoinWs} onOpenChange={setShowJoinWs} />
-        <CreateChannelModal open={showCreateChan} onOpenChange={setShowCreateChan} />
-        
-        {/* Omni-Command Palette */}
-        <CommandPalette />
+          {/* 3. Main Chat Viewport */}
+          <ChatViewport onSendMessage={sendMessage} onSendTyping={sendTyping} />
 
-        {/* Global notifications and confirmation dialogs */}
-        <Toaster />
-        <ConfirmDialog />
-        <IncomingCallDialog />
+          {/* --- Dialog / Modals --- */}
+          <CreateWorkspaceModal open={showCreateWs} onOpenChange={setShowCreateWs} />
+          <JoinWorkspaceModal open={showJoinWs} onOpenChange={setShowJoinWs} />
+          <CreateChannelModal open={showCreateChan} onOpenChange={setShowCreateChan} />
+          
+          {/* Omni-Command Palette */}
+          <CommandPalette />
+
+          {/* Global notifications and confirmation dialogs */}
+          <Toaster />
+          <ConfirmDialog />
+          <IncomingCallDialog />
+        </div>
       </div>
     </VoiceCallProvider>
   );

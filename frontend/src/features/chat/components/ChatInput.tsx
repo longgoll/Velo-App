@@ -130,8 +130,37 @@ export default function ChatInput({
     }
   };
 
+  const autoTransformEmotes = (val: string): string => {
+    const isAutoEmote = localStorage.getItem('chat_auto_emote') !== 'false';
+    if (!isAutoEmote) return val;
+
+    const emotesMap: Record<string, string> = {
+      ':)': '🙂',
+      ':-)': '🙂',
+      ':D': '😄',
+      ':-D': '😄',
+      ':(': '🥺',
+      ':-(': '🥺',
+      '<3': '❤️',
+      ';)': '😉',
+      ';-)': '😉',
+      'B)': '😎',
+      'B-)': '😎',
+      ':P': '😛',
+      ':-P': '😛',
+    };
+
+    let result = val;
+    for (const [emote, emoji] of Object.entries(emotesMap)) {
+      const escaped = emote.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      result = result.replace(new RegExp(escaped, 'g'), emoji);
+    }
+    return result;
+  };
+
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
+    const rawVal = e.target.value;
+    const val = autoTransformEmotes(rawVal);
     setText(val);
     if (onTyping && val.trim() && Date.now() - lastTypingSentRef.current > 2000) {
       lastTypingSentRef.current = Date.now();
@@ -409,14 +438,16 @@ export default function ChatInput({
           <Smile className="w-4 h-4" />
         </button>
 
-        <Button
-          type="submit"
-          size="icon"
-          className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg h-8 w-8 flex items-center justify-center shadow transition active:scale-95 shrink-0 cursor-pointer"
-          disabled={!text.trim()}
-        >
-          <Send className="w-4 h-4" />
-        </Button>
+        {localStorage.getItem('chat_show_send_button') !== 'false' && (
+          <Button
+            type="submit"
+            size="icon"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg h-8 w-8 flex items-center justify-center shadow transition active:scale-95 shrink-0 cursor-pointer"
+            disabled={!text.trim()}
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        )}
       </form>
     </div>
   );
