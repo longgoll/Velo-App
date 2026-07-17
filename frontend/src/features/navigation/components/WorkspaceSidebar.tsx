@@ -21,7 +21,8 @@ export default function WorkspaceSidebar({
     activeWorkspaceId, 
     activeFilter, 
     setActiveFilter,
-    unreadChannels
+    unreadChannels,
+    setActiveChannelId
   } = useChatStore();
 
   const { data: workspaces = [] } = useQuery<Workspace[]>({
@@ -98,7 +99,13 @@ export default function WorkspaceSidebar({
           <Tooltip>
             <TooltipTrigger
               render={
-                <button className="w-12 h-12 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400 font-bold hover:bg-indigo-600 hover:text-white hover:rounded-xl transition-all duration-300 shadow-lg shadow-indigo-500/5 cursor-pointer relative outline-none">
+                <button 
+                  onClick={() => {
+                    setActiveFilter('all');
+                    setActiveChannelId(null);
+                  }}
+                  className="w-12 h-12 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400 font-bold hover:bg-indigo-600 hover:text-white hover:rounded-xl transition-all duration-300 shadow-lg shadow-indigo-500/5 cursor-pointer relative outline-none"
+                >
                   {activeWs ? (
                     <span className="text-sm font-semibold tracking-wider font-mono">
                       {activeWs.name.slice(0, 2).toUpperCase()}

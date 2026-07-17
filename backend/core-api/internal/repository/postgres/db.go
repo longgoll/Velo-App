@@ -32,6 +32,7 @@ func InitDB(cfg *config.Config) *gorm.DB {
 		&domain.WorkspaceMember{},
 		&domain.DMChannel{},
 		&domain.ChannelMember{},
+		&domain.Notification{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to run database migrations: %v", err)

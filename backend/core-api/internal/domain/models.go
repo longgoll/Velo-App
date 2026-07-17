@@ -116,3 +116,32 @@ func (dm *DMChannel) BeforeCreate(tx *gorm.DB) (err error) {
 	}
 	return
 }
+
+type NotificationType string
+
+const (
+	NotificationTypeMention NotificationType = "mention"
+	NotificationTypeDM      NotificationType = "dm"
+)
+
+type Notification struct {
+	ID        string           `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	UserID    string           `gorm:"type:varchar(36);not null;index:idx_notifications_user_created,priority:1;index:idx_notifications_user_read,priority:1" json:"user_id"`
+	SenderID  string           `gorm:"type:varchar(36);not null" json:"sender_id"`
+	ChannelID string           `gorm:"type:varchar(36);not null" json:"channel_id"`
+	MessageID string           `gorm:"type:varchar(36);not null" json:"message_id"`
+	Content   string           `gorm:"type:text;not null" json:"content"`
+	Type      NotificationType `gorm:"type:varchar(20);not null" json:"type"`
+	IsRead    bool             `gorm:"type:boolean;default:false;not null;index:idx_notifications_user_read,priority:2" json:"is_read"`
+	CreatedAt time.Time        `gorm:"index:idx_notifications_user_created,priority:2" json:"created_at"`
+
+	Sender  User    `gorm:"foreignKey:SenderID" json:"sender,omitempty"`
+	Channel Channel `gorm:"foreignKey:ChannelID" json:"channel,omitempty"`
+}
+
+func (n *Notification) BeforeCreate(tx *gorm.DB) (err error) {
+	if n.ID == "" {
+		n.ID = uuid.New().String()
+	}
+	return
+}

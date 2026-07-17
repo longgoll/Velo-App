@@ -19,6 +19,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/image/draw"
+	"gorm.io/gorm"
 )
 
 type queueMessage struct {
@@ -31,6 +32,7 @@ type queueMessage struct {
 }
 
 type MessageWorker struct {
+	db          *gorm.DB
 	redisClient *redis.Client
 	messageRepo domain.MessageRepository
 	minioClient *minio.Client
@@ -39,6 +41,7 @@ type MessageWorker struct {
 }
 
 func NewMessageWorker(
+	db *gorm.DB,
 	redisClient *redis.Client,
 	messageRepo domain.MessageRepository,
 	minioClient *minio.Client,
@@ -46,6 +49,7 @@ func NewMessageWorker(
 	s3Endpoint string,
 ) *MessageWorker {
 	return &MessageWorker{
+		db:          db,
 		redisClient: redisClient,
 		messageRepo: messageRepo,
 		minioClient: minioClient,
@@ -89,6 +93,9 @@ func (w *MessageWorker) Start(ctx context.Context) {
 			}
 			log.Printf("Successfully saved message %s from user %s in channel %s to ScyllaDB", dbMsg.ID, dbMsg.Username, dbMsg.ChannelID)
 
+			// Process notifications/mentions in the background asynchronously
+			go w.processNotifications(dbMsg)
+
 			// Check if message is an image to run async optimization and thumbnail processing
 			if matches := imageMsgRegex.FindStringSubmatch(dbMsg.Content); len(matches) == 3 {
 				fileName := matches[1]
@@ -99,6 +106,164 @@ func (w *MessageWorker) Start(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (w *MessageWorker) processNotifications(msg *domain.Message) {
+	// 1. Fetch channel details to see if it is a regular channel or a DM
+	var channel domain.Channel
+	err := w.db.Where("id = ?", msg.ChannelID).First(&channel).Error
+
+	if err == nil {
+		// Public or Private Channel message
+		w.processChannelNotifications(&channel, msg)
+	} else if err == gorm.ErrRecordNotFound {
+		// DM Channel message
+		w.processDMNotifications(msg)
+	} else {
+		log.Printf("Error querying channel %s in worker: %v", msg.ChannelID, err)
+	}
+}
+
+func (w *MessageWorker) processDMNotifications(msg *domain.Message) {
+	var dmChannel domain.DMChannel
+	err := w.db.Where("id = ?", msg.ChannelID).First(&dmChannel).Error
+	if err != nil {
+		log.Printf("Error querying DM channel %s in worker: %v", msg.ChannelID, err)
+		return
+	}
+
+	// Recipient is the other participant
+	recipientID := dmChannel.UserTwoID
+	if msg.UserID == dmChannel.UserTwoID {
+		recipientID = dmChannel.UserOneID
+	}
+
+	notification := &domain.Notification{
+		UserID:    recipientID,
+		SenderID:  msg.UserID,
+		ChannelID: msg.ChannelID,
+		MessageID: msg.ID,
+		Content:   msg.Content,
+		Type:      domain.NotificationTypeDM,
+		IsRead:    false,
+		CreatedAt: msg.Timestamp,
+	}
+
+	if err := w.db.Create(notification).Error; err != nil {
+		log.Printf("Error creating DM notification: %v", err)
+	}
+}
+
+var mentionRegex = regexp.MustCompile(`@([a-zA-Z0-9_-]+)`)
+
+func (w *MessageWorker) processChannelNotifications(channel *domain.Channel, msg *domain.Message) {
+	content := msg.Content
+	contentLower := strings.ToLower(content)
+
+	hasAll := strings.Contains(contentLower, "@all")
+	hasHere := strings.Contains(contentLower, "@here")
+
+	// 1. Get all channel members
+	// If it's a private channel, query channel_members.
+	// If it's a public channel, query workspace_members.
+	var userIDs []string
+	var err error
+
+	if channel.IsPrivate {
+		err = w.db.Model(&domain.ChannelMember{}).
+			Where("channel_id = ? AND user_id != ?", channel.ID, msg.UserID).
+			Pluck("user_id", &userIDs).Error
+	} else {
+		err = w.db.Model(&domain.WorkspaceMember{}).
+			Where("workspace_id = ? AND user_id != ?", channel.WorkspaceID, msg.UserID).
+			Pluck("user_id", &userIDs).Error
+	}
+
+	if err != nil {
+		log.Printf("Error querying channel members for notifications: %v", err)
+		return
+	}
+
+	if len(userIDs) == 0 {
+		return
+	}
+
+	// Track users we need to notify
+	notifyUserIDs := make(map[string]bool)
+
+	if hasAll {
+		// Notify everyone in the channel
+		for _, uid := range userIDs {
+			notifyUserIDs[uid] = true
+		}
+	} else if hasHere {
+		// Notify only online members of the channel
+		// Get all online users from Valkey set "online_users"
+		onlineUsernames, err := w.redisClient.SMembers(context.Background(), "online_users").Result()
+		if err == nil && len(onlineUsernames) > 0 {
+			onlineMap := make(map[string]bool)
+			for _, name := range onlineUsernames {
+				onlineMap[strings.ToLower(name)] = true
+			}
+
+			// We need to fetch the usernames of the channel members to check presence
+			var members []domain.User
+			err = w.db.Where("id IN ?", userIDs).Find(&members).Error
+			if err == nil {
+				for _, member := range members {
+					if onlineMap[strings.ToLower(member.Username)] {
+						notifyUserIDs[member.ID] = true
+					}
+				}
+			}
+		}
+	} else {
+		// Check for specific @username mentions
+		matches := mentionRegex.FindAllStringSubmatch(content, -1)
+		if len(matches) > 0 {
+			usernames := make([]string, 0)
+			for _, match := range matches {
+				if len(match) > 1 {
+					usernames = append(usernames, strings.ToLower(match[1]))
+				}
+			}
+
+			if len(usernames) > 0 {
+				// Query GORM to find matching users in the userIDs list
+				var matchedUsers []domain.User
+				err = w.db.Where("id IN ? AND LOWER(username) IN ?", userIDs, usernames).Find(&matchedUsers).Error
+				if err == nil {
+					for _, u := range matchedUsers {
+						notifyUserIDs[u.ID] = true
+					}
+				}
+			}
+		}
+	}
+
+	if len(notifyUserIDs) == 0 {
+		return
+	}
+
+	// 2. Prepare bulk insert of notifications
+	notifications := make([]*domain.Notification, 0, len(notifyUserIDs))
+	for uid := range notifyUserIDs {
+		notifications = append(notifications, &domain.Notification{
+			UserID:    uid,
+			SenderID:  msg.UserID,
+			ChannelID: msg.ChannelID,
+			MessageID: msg.ID,
+			Content:   msg.Content,
+			Type:      domain.NotificationTypeMention,
+			IsRead:    false,
+			CreatedAt: msg.Timestamp,
+		})
+	}
+
+	// Insert in batches of 500
+	if err := w.db.CreateInBatches(notifications, 500).Error; err != nil {
+		log.Printf("Error bulk inserting channel notifications: %v", err)
+	}
 }
 
 func (w *MessageWorker) processImageAttachment(ctx context.Context, dbMsg *domain.Message, fileName, originalURL string) {

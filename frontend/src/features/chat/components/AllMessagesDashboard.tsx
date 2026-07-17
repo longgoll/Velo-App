@@ -99,7 +99,34 @@ export default function AllMessagesDashboard({ onSendMessage }: AllMessagesDashb
         isDm: true,
       };
     }
-    return null;
+  };
+
+  // Fetch actual database mentions/notifications
+  const { data: dbNotifications = [], refetch: refetchNotifications } = useQuery<any[]>({
+    queryKey: ['notifications'],
+    queryFn: async () => {
+      const res = await api.get('/notifications');
+      return res.data;
+    },
+    refetchInterval: 5000,
+  });
+
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      await api.put(`/notifications/${notificationId}/read`);
+      refetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await api.put('/notifications/read-all');
+      refetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err);
+    }
   };
 
   // 4. Gather active channel IDs (unread + recent)
@@ -184,28 +211,25 @@ export default function AllMessagesDashboard({ onSendMessage }: AllMessagesDashb
     })
     .filter((item) => item.info !== null);
 
-  // Filters mentions list
-  const currentUserStr = localStorage.getItem('user');
-  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
-  const currentUsername = currentUser?.username || '';
-
-  const mentionsList: { info: any; message: ChatMessage }[] = [];
-  if (currentUsername) {
-    Object.entries(messagesMap).forEach(([channelId, messages]) => {
-      const info = getChannelInfo(channelId);
-      if (!info) return;
-      messages.forEach((msg) => {
-        // Mentions if message content contains "@username" or just "username" (case insensitive)
-        const isMention = msg.content.toLowerCase().includes(`@${currentUsername.toLowerCase()}`) && 
-                          msg.user_id !== currentUser?.id;
-        if (isMention) {
-          mentionsList.push({ info, message: msg });
-        }
-      });
-    });
-  }
-  // Sort mentions by timestamp descending
-  mentionsList.sort((a, b) => Number(b.message.timestamp) - Number(a.message.timestamp));
+  // Convert DB notifications to mentionsList format
+  const mentionsList = dbNotifications
+    .map((notif) => {
+      const info = getChannelInfo(notif.channel_id);
+      return {
+        id: notif.id,
+        isRead: notif.is_read,
+        info,
+        message: {
+          id: notif.message_id,
+          channel_id: notif.channel_id,
+          user_id: notif.sender_id,
+          username: notif.sender?.username || 'Người dùng',
+          content: notif.content,
+          timestamp: new Date(notif.created_at).getTime(),
+        },
+      };
+    })
+    .filter((item) => item.info !== null);
 
   return (
     <div className="flex-1 bg-zinc-950 flex flex-col h-full select-none relative overflow-hidden">
@@ -449,18 +473,32 @@ export default function AllMessagesDashboard({ onSendMessage }: AllMessagesDashb
         {/* ================== MENTIONS TAB ================== */}
         {activeTab === 'mentions' && (
           <div className="space-y-3 max-w-4xl mx-auto">
-            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Được đề cập gần đây</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Được đề cập gần đây</h3>
+              {mentionsList.some(item => !item.isRead) && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  className="px-2.5 py-1 text-[9px] font-bold text-zinc-400 hover:text-indigo-400 hover:bg-indigo-950/20 border border-zinc-850 hover:border-indigo-500/30 rounded-lg transition cursor-pointer outline-none"
+                >
+                  Đánh dấu tất cả đã đọc
+                </button>
+              )}
+            </div>
             
             {mentionsList.length > 0 ? (
-              mentionsList.map(({ info, message }) => {
+              mentionsList.map((item) => {
+                const { info, message, isRead } = item;
                 if (!info) return null;
                 const Icon = info.isDm ? Users : (info.type === 'voice' ? Volume2 : Hash);
+                const isUnread = !isRead;
 
                 return (
                   <div 
-                    key={message.id}
+                    key={item.id}
                     onClick={() => navigateToConversation(info.id, info.isDm, info.workspaceId)}
-                    className="p-4 bg-zinc-900/10 hover:bg-zinc-900/30 border border-zinc-900/80 rounded-2xl cursor-pointer transition group flex items-start gap-4"
+                    className={`p-4 hover:bg-zinc-900/30 border rounded-2xl cursor-pointer transition group flex items-start gap-4 ${
+                      isUnread ? 'border-indigo-500/25 bg-indigo-950/5' : 'border-zinc-900/80 bg-zinc-900/10'
+                    }`}
                   >
                     <Avatar size="sm">
                       <AvatarFallback className={`text-[10px] font-bold ${getAvatarGradient(message.username)}`}>
@@ -472,19 +510,36 @@ export default function AllMessagesDashboard({ onSendMessage }: AllMessagesDashb
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-zinc-200 text-xs">{message.username}</span>
-                          <span className="text-[9px] text-zinc-500">
+                          {isUnread && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                          )}
+                          <span className="text-[9px] text-zinc-550">
                             {new Date(message.timestamp).toLocaleString()}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-1.5 text-zinc-500 group-hover:text-indigo-400 transition-colors">
-                          <Icon className="w-3.5 h-3.5" />
-                          <span className="text-[10px] font-medium">{info.name} ({info.workspaceName})</span>
+                        <div className="flex items-center gap-2.5">
+                          {isUnread && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsRead(item.id);
+                              }}
+                              className="px-1.5 py-0.5 text-[9px] font-bold text-zinc-400 hover:text-emerald-400 flex items-center gap-1 bg-zinc-950 border border-zinc-850 rounded hover:border-emerald-500/40 transition duration-150 cursor-pointer outline-none shrink-0"
+                              title="Đánh dấu đã đọc"
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                              <span>Đã đọc</span>
+                            </button>
+                          )}
+                          <div className="flex items-center gap-1.5 text-zinc-500 group-hover:text-indigo-400 transition-colors">
+                            <Icon className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-medium">{info.name} ({info.workspaceName})</span>
+                          </div>
                         </div>
                       </div>
 
                       <p className="text-zinc-300 text-xs mt-1.5 select-text break-words whitespace-pre-wrap leading-relaxed border-l-2 border-indigo-500/40 pl-3">
-                        {/* Highlight mention */}
                         {message.content}
                       </p>
                     </div>

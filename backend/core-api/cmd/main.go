@@ -81,6 +81,7 @@ func main() {
 	workspaceRepo := postgres.NewWorkspaceRepository(db)
 	channelRepo := postgres.NewChannelRepository(db)
 	messageRepo := scylla.NewMessageRepository(scyllaSession)
+	notificationRepo := postgres.NewNotificationRepository(db)
 
 	// 5. Initialize UseCases
 	userUseCase := usecase.NewUserUseCase(userRepo, tokenMaker)
@@ -88,9 +89,10 @@ func main() {
 	channelUseCase := usecase.NewChannelUseCase(channelRepo, workspaceRepo, cfg.LiveKitURL, cfg.LiveKitApiKey, cfg.LiveKitApiSecret)
 	messageUseCase := usecase.NewMessageUseCase(messageRepo, channelRepo, workspaceRepo)
 	attachmentUseCase := usecase.NewAttachmentUseCase(minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)
+	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo)
 
 	// 5.5. Start Background Message Worker
-	msgWorker := worker.NewMessageWorker(redisClient, messageRepo, minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)
+	msgWorker := worker.NewMessageWorker(db, redisClient, messageRepo, minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)
 	msgWorker.Start(context.Background())
 
 	// 6. Start gRPC Server in background
@@ -135,6 +137,7 @@ func main() {
 	httpDelivery.NewChannelHandler(api, authMiddleware, channelUseCase)
 	httpDelivery.NewMessageHandler(api, authMiddleware, messageUseCase)
 	httpDelivery.NewAttachmentHandler(api, authMiddleware, attachmentUseCase)
+	httpDelivery.NewNotificationHandler(api, authMiddleware, notificationUseCase)
 
 	// Health Check
 	app.Get("/health", func(c *fiber.Ctx) error {

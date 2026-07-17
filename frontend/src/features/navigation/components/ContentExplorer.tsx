@@ -523,6 +523,8 @@ export default function ContentExplorer() {
 
   // Auto-select first text channel of the active workspace if none is active or active is invalid
   useEffect(() => {
+    if (activeFilter === 'all') return; // Do not auto-select when in "All Messages" view
+
     if (activeWorkspaceId && channels.length > 0) {
       const isValid = channels.some((c) => c.id === activeChannelId) || 
                    (dmChannels && dmChannels.some((d) => d.id === activeChannelId));
