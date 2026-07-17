@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hoanglong/chat/backend/core-api/internal/domain"
@@ -52,6 +53,17 @@ func (u *channelUseCase) Create(userID string, workspaceID string, req *domain.C
 
 	if req.Name == "" {
 		return nil, errors.New("channel name is required")
+	}
+
+	// Verify duplicate channel name
+	channels, err := u.channelRepo.ListForWorkspace(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	for _, ch := range channels {
+		if strings.EqualFold(ch.Name, req.Name) {
+			return nil, errors.New("channel name already exists in this workspace")
+		}
 	}
 
 	if req.Type != domain.ChannelTypeText && req.Type != domain.ChannelTypeVoice {
@@ -234,4 +246,84 @@ func (u *channelUseCase) GetCallParticipants(userID string, workspaceID string, 
 	}
 
 	return results, nil
+}
+
+func (u *channelUseCase) Update(userID string, workspaceID string, channelID string, req *domain.UpdateChannelReq) (*domain.Channel, error) {
+	// Verify user is a member of workspace
+	member, err := u.workspaceRepo.GetMember(workspaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if member == nil {
+		return nil, errors.New("user is not a member of this workspace")
+	}
+
+	// Verify permissions (admin or owner can update channels)
+	if member.Role != "owner" && member.Role != "admin" {
+		return nil, errors.New("only workspace owner or admin can update channels")
+	}
+
+	if req.Name == "" {
+		return nil, errors.New("channel name is required")
+	}
+
+	// Verify channel exists and belongs to the workspace
+	channel, err := u.channelRepo.GetByID(channelID)
+	if err != nil {
+		return nil, err
+	}
+	if channel == nil || channel.WorkspaceID != workspaceID {
+		return nil, errors.New("channel not found in this workspace")
+	}
+
+	// Verify duplicate channel name (excluding current channel)
+	channels, err := u.channelRepo.ListForWorkspace(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	for _, ch := range channels {
+		if ch.ID != channelID && strings.EqualFold(ch.Name, req.Name) {
+			return nil, errors.New("channel name already exists in this workspace")
+		}
+	}
+
+	channel.Name = req.Name
+	err = u.channelRepo.Update(channel)
+	if err != nil {
+		return nil, err
+	}
+
+	return channel, nil
+}
+
+func (u *channelUseCase) Delete(userID string, workspaceID string, channelID string) error {
+	// Verify user is a member of workspace
+	member, err := u.workspaceRepo.GetMember(workspaceID, userID)
+	if err != nil {
+		return err
+	}
+	if member == nil {
+		return errors.New("user is not a member of this workspace")
+	}
+
+	// Verify permissions (admin or owner can delete channels)
+	if member.Role != "owner" && member.Role != "admin" {
+		return errors.New("only workspace owner or admin can delete channels")
+	}
+
+	// Verify channel exists and belongs to the workspace
+	channel, err := u.channelRepo.GetByID(channelID)
+	if err != nil {
+		return err
+	}
+	if channel == nil || channel.WorkspaceID != workspaceID {
+		return errors.New("channel not found in this workspace")
+	}
+
+	err = u.channelRepo.Delete(channelID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getAvatarGradient } from '@/lib/utils';
 import WorkspaceSettingsModal from '@/features/workspace/components/WorkspaceSettingsModal';
+import ChannelSettingsModal from '@/features/workspace/components/ChannelSettingsModal';
 
 // Mock data for Communities
 const MOCK_COMMUNITIES = [
@@ -22,6 +23,8 @@ interface VoiceChannelItemProps {
   activeChannelId: string | null;
   activeVoiceChannelId: string | null;
   handleChannelClick: (chan: Channel) => void;
+  isOwnerOrAdmin: boolean;
+  onOpenSettings: (chan: Channel) => void;
 }
 
 function VoiceChannelItem({
@@ -30,6 +33,8 @@ function VoiceChannelItem({
   activeChannelId,
   activeVoiceChannelId,
   handleChannelClick,
+  isOwnerOrAdmin,
+  onOpenSettings,
 }: VoiceChannelItemProps) {
   const isUserInThisVoice = activeVoiceChannelId === chan.id;
 
@@ -50,10 +55,10 @@ function VoiceChannelItem({
   });
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-0.5 group relative animate-in fade-in duration-255">
       <button
         onClick={() => handleChannelClick(chan)}
-        className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
+        className={`w-full flex items-center justify-between pl-2 pr-8 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
           activeChannelId === chan.id
             ? 'bg-zinc-800/80 text-white'
             : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
@@ -66,17 +71,30 @@ function VoiceChannelItem({
           </span>
         </div>
         {isUserInThisVoice ? (
-          <span className="flex h-2 w-2 relative">
+          <span className="flex h-2 w-2 relative mr-1">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
         ) : participants.length > 0 ? (
-          <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 animate-pulse font-bold bg-emerald-950/40 border border-emerald-500/10 px-1 rounded">
+          <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 animate-pulse font-bold bg-emerald-950/40 border border-emerald-500/10 px-1 rounded mr-1">
             <span className="w-1 h-1 rounded-full bg-emerald-400" />
             {participants.length}
           </span>
         ) : null}
       </button>
+
+      {isOwnerOrAdmin && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenSettings(chan);
+          }}
+          className="absolute right-1.5 top-[7px] p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity duration-150 cursor-pointer z-10"
+          title="Cài đặt kênh"
+        >
+          <Settings className="w-3 h-3" />
+        </button>
+      )}
 
       {/* Render active participants list under channel name */}
       {participants.length > 0 && (
@@ -105,6 +123,8 @@ interface TextChannelItemProps {
   activeChannelId: string | null;
   unreadChannels: Record<string, number>;
   handleChannelClick: (chan: Channel) => void;
+  isOwnerOrAdmin: boolean;
+  onOpenSettings: (chan: Channel) => void;
 }
 
 function TextChannelItem({
@@ -112,12 +132,14 @@ function TextChannelItem({
   activeChannelId,
   unreadChannels,
   handleChannelClick,
+  isOwnerOrAdmin,
+  onOpenSettings,
 }: TextChannelItemProps) {
   return (
-    <div className="flex flex-col gap-0.5 animate-in fade-in duration-255">
+    <div className="flex flex-col gap-0.5 animate-in fade-in duration-255 group relative">
       <button
         onClick={() => handleChannelClick(chan)}
-        className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
+        className={`w-full flex items-center justify-between pl-2 pr-8 py-1.5 rounded-lg text-xs font-medium transition outline-none ${
           activeChannelId === chan.id
             ? 'bg-zinc-800/80 text-white shadow-sm'
             : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
@@ -130,11 +152,24 @@ function TextChannelItem({
           </span>
         </div>
         {unreadChannels[chan.id] > 0 && (
-          <span className="flex items-center justify-center min-w-[16px] h-[16px] px-1 text-[9px] font-bold text-white bg-rose-500 rounded-full shrink-0">
+          <span className="flex items-center justify-center min-w-[16px] h-[16px] px-1 text-[9px] font-bold text-white bg-rose-500 rounded-full shrink-0 mr-1">
             {unreadChannels[chan.id]}
           </span>
         )}
       </button>
+
+      {isOwnerOrAdmin && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenSettings(chan);
+          }}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity duration-150 cursor-pointer"
+          title="Cài đặt kênh"
+        >
+          <Settings className="w-3 h-3" />
+        </button>
+      )}
     </div>
   );
 }
@@ -267,6 +302,11 @@ export default function ContentExplorer() {
   const [copiedId, setCopiedId] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [settingsChannel, setSettingsChannel] = useState<Channel | null>(null);
+
+  const handleOpenChannelSettings = (chan: Channel) => {
+    setSettingsChannel(chan);
+  };
 
   const handleCopyId = () => {
     if (!activeWorkspaceId) return;
@@ -657,6 +697,8 @@ export default function ContentExplorer() {
                             activeChannelId={activeChannelId}
                             unreadChannels={unreadChannels}
                             handleChannelClick={handleChannelClick}
+                            isOwnerOrAdmin={isOwnerOrAdmin}
+                            onOpenSettings={handleOpenChannelSettings}
                           />
                         ))}
                         {textChannels.length === 0 && !isChannelsLoading && (
@@ -700,6 +742,8 @@ export default function ContentExplorer() {
                             activeChannelId={activeChannelId}
                             activeVoiceChannelId={activeVoiceChannelId}
                             handleChannelClick={handleChannelClick}
+                            isOwnerOrAdmin={isOwnerOrAdmin}
+                            onOpenSettings={handleOpenChannelSettings}
                           />
                         ))}
                         {voiceChannels.length === 0 && !isChannelsLoading && (
@@ -1044,6 +1088,17 @@ export default function ContentExplorer() {
         <WorkspaceSettingsModal
           open={showSettings}
           onOpenChange={setShowSettings}
+          workspaceId={activeWorkspaceId}
+        />
+      )}
+
+      {settingsChannel && activeWorkspaceId && (
+        <ChannelSettingsModal
+          open={settingsChannel !== null}
+          onOpenChange={(open) => {
+            if (!open) setSettingsChannel(null);
+          }}
+          channel={settingsChannel}
           workspaceId={activeWorkspaceId}
         />
       )}

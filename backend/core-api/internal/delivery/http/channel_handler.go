@@ -18,6 +18,8 @@ func NewChannelHandler(router fiber.Router, authMiddleware fiber.Handler, channe
 	channelGroup.Get("/", handler.List)
 	channelGroup.Post("/:channel_id/token", handler.GetCallToken)
 	channelGroup.Get("/:channel_id/participants", handler.GetCallParticipants)
+	channelGroup.Put("/:channel_id", handler.Update)
+	channelGroup.Delete("/:channel_id", handler.Delete)
 }
 
 func (h *ChannelHandler) Create(c *fiber.Ctx) error {
@@ -86,4 +88,43 @@ func (h *ChannelHandler) GetCallParticipants(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(participants)
+}
+
+func (h *ChannelHandler) Update(c *fiber.Ctx) error {
+	payload := c.Locals(authorizationPayloadKey).(*token.Payload)
+	workspaceID := c.Params("workspace_id")
+	channelID := c.Params("channel_id")
+
+	var req domain.UpdateChannelReq
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	res, err := h.channelUseCase.Update(payload.UserID, workspaceID, channelID, &req)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(res)
+}
+
+func (h *ChannelHandler) Delete(c *fiber.Ctx) error {
+	payload := c.Locals(authorizationPayloadKey).(*token.Payload)
+	workspaceID := c.Params("workspace_id")
+	channelID := c.Params("channel_id")
+
+	err := h.channelUseCase.Delete(payload.UserID, workspaceID, channelID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "channel deleted successfully",
+	})
 }

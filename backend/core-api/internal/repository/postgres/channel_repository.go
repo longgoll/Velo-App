@@ -36,3 +36,11 @@ func (r *channelGormRepository) ListForWorkspace(workspaceID string) ([]domain.C
 	err := r.db.Where("workspace_id = ?", workspaceID).Order("created_at asc").Find(&channels).Error
 	return channels, err
 }
+
+func (r *channelGormRepository) Update(channel *domain.Channel) error {
+	return r.db.Save(channel).Error
+}
+
+func (r *channelGormRepository) Delete(id string) error {
+	return r.db.Where("id = ?", id).Delete(&domain.Channel{}).Error
+}
