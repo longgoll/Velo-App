@@ -9,6 +9,8 @@ interface ChatMessage {
   username: string;
   content: string;
   timestamp: string | number;
+  reactions?: any[];
+  type?: string;
 }
 
 export const useWebSocket = (token: string | null) => {
@@ -96,13 +98,18 @@ export const useWebSocket = (token: string | null) => {
 
         if (data.type === 'message') {
           const chatMsg: ChatMessage = data.payload;
+          const isReactionUpdate = chatMsg.type === 'reaction';
           
           // Cập nhật ngầm dữ liệu cache của TanStack Query cho channel tương ứng
           queryClient.setQueryData(['messages', chatMsg.channel_id], (oldMessages: ChatMessage[] | undefined) => {
-            if (!oldMessages) return [chatMsg];
+            if (!oldMessages) return isReactionUpdate ? undefined : [chatMsg];
             // Tránh duplicate tin nhắn, nhưng cập nhật nội dung nếu có thay đổi (ví dụ: ảnh thumbnail)
             if (oldMessages.some(m => m.id === chatMsg.id)) {
               return oldMessages.map(m => m.id === chatMsg.id ? chatMsg : m);
+            }
+
+            if (isReactionUpdate) {
+              return oldMessages;
             }
 
             // Check if there is an optimistic upload message to replace
@@ -151,7 +158,7 @@ export const useWebSocket = (token: string | null) => {
           }
 
           // Xử lý thông báo khi nhận tin ở kênh không hoạt động
-          if (chatMsg.channel_id !== activeChannelIdRef.current) {
+          if (!isReactionUpdate && chatMsg.channel_id !== activeChannelIdRef.current) {
             useChatStore.getState().incrementUnread(chatMsg.channel_id);
 
             // Bắn Native Browser Notification nếu tab đang ẩn và có quyền

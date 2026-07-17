@@ -23,12 +23,14 @@ import (
 )
 
 type queueMessage struct {
-	ID        string `json:"id"`
-	ChannelID string `json:"channel_id"`
-	UserID    string `json:"user_id"`
-	Username  string `json:"username"`
-	Content   string `json:"content"`
-	Timestamp int64  `json:"timestamp"`
+	ID        string                 `json:"id"`
+	ChannelID string                 `json:"channel_id"`
+	UserID    string                 `json:"user_id"`
+	Username  string                 `json:"username"`
+	Content   string                 `json:"content"`
+	Timestamp int64                  `json:"timestamp"`
+	Reactions []domain.ReactionSummary `json:"reactions,omitempty"`
+	Type      string                 `json:"type,omitempty"`
 }
 
 type MessageWorker struct {
@@ -74,6 +76,10 @@ func (w *MessageWorker) Start(ctx context.Context) {
 			var qMsg queueMessage
 			if err := json.Unmarshal([]byte(msg.Payload), &qMsg); err != nil {
 				log.Printf("Error unmarshalling queue message: %v", err)
+				continue
+			}
+
+			if qMsg.Type == "reaction" {
 				continue
 			}
 
@@ -218,24 +224,25 @@ func (w *MessageWorker) processChannelNotifications(channel *domain.Channel, msg
 			}
 		}
 	} else {
-		// Check for specific @username mentions
-		matches := mentionRegex.FindAllStringSubmatch(content, -1)
-		if len(matches) > 0 {
-			usernames := make([]string, 0)
-			for _, match := range matches {
-				if len(match) > 1 {
-					usernames = append(usernames, strings.ToLower(match[1]))
+		// Check for specific @username mentions (supporting usernames with spaces)
+		var channelMembers []domain.User
+		err = w.db.Where("id IN ?", userIDs).Find(&channelMembers).Error
+		if err == nil {
+			tempContent := contentLower
+			// Sort members by username length descending to avoid matching substrings (e.g. "@Dinh" matching "@Dinh Duy")
+			for i := 0; i < len(channelMembers); i++ {
+				for j := i + 1; j < len(channelMembers); j++ {
+					if len(channelMembers[i].Username) < len(channelMembers[j].Username) {
+						channelMembers[i], channelMembers[j] = channelMembers[j], channelMembers[i]
+					}
 				}
 			}
 
-			if len(usernames) > 0 {
-				// Query GORM to find matching users in the userIDs list
-				var matchedUsers []domain.User
-				err = w.db.Where("id IN ? AND LOWER(username) IN ?", userIDs, usernames).Find(&matchedUsers).Error
-				if err == nil {
-					for _, u := range matchedUsers {
-						notifyUserIDs[u.ID] = true
-					}
+			for _, member := range channelMembers {
+				mentionKey := "@" + strings.ToLower(member.Username)
+				if strings.Contains(tempContent, mentionKey) {
+					notifyUserIDs[member.ID] = true
+					tempContent = strings.ReplaceAll(tempContent, mentionKey, "___processed_mention___")
 				}
 			}
 		}

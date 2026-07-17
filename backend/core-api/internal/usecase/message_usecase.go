@@ -225,6 +225,7 @@ type queueMessage struct {
 	Content   string                   `json:"content"`
 	Timestamp int64                    `json:"timestamp"`
 	Reactions []domain.ReactionSummary `json:"reactions,omitempty"`
+	Type      string                   `json:"type,omitempty"`
 }
 
 func (u *messageUseCase) broadcastMessageUpdate(msg *domain.Message) {
@@ -236,6 +237,7 @@ func (u *messageUseCase) broadcastMessageUpdate(msg *domain.Message) {
 		Content:   msg.Content,
 		Timestamp: msg.Timestamp.UnixMilli(),
 		Reactions: msg.Reactions,
+		Type:      "reaction",
 	}
 	payload, err := json.Marshal(pubMsg)
 	if err != nil {

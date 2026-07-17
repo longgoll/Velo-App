@@ -199,6 +199,7 @@ async fn handle_socket(
                                         .unwrap()
                                         .as_millis() as i64,
                                     reactions: None,
+                                    message_type: None,
                                 };
 
                                 // Publish tin nhắn lên Valkey Pub/Sub

@@ -33,6 +33,7 @@ export interface ChatMessage {
   content: string;
   timestamp: string | number;
   reactions?: ReactionSummary[];
+  type?: string;
 }
 
 export interface DMChannel {

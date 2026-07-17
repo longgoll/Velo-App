@@ -205,6 +205,18 @@ export default function MessageItem({
   const [showPicker, setShowPicker] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
 
+  useEffect(() => {
+    if (!showPicker) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.emoji-picker-container') && !target.closest('.emoji-picker-trigger')) {
+        setShowPicker(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showPicker]);
+
   const handleCopyText = () => {
     navigator.clipboard.writeText(msg.content);
     setCopiedText(true);
@@ -565,7 +577,7 @@ export default function MessageItem({
             {/* Add reaction trigger */}
             <button
               onClick={() => setShowPicker(!showPicker)}
-              className={`w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition active:scale-90 cursor-pointer border-0 outline-none ${
+              className={`w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition active:scale-90 cursor-pointer border-0 outline-none emoji-picker-trigger ${
                 showPicker ? 'bg-zinc-800 text-white' : ''
               }`}
               title="Thêm phản hồi"
@@ -595,7 +607,7 @@ export default function MessageItem({
 
         {/* Emoji Picker Popover */}
         {showPicker && (
-          <div className="absolute right-3 top-6 bg-zinc-950 border border-zinc-850 rounded-xl shadow-2xl p-2.5 z-30 flex gap-1.5 flex-wrap max-w-[220px] animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute right-3 top-6 bg-zinc-950 border border-zinc-850 rounded-xl shadow-2xl p-2.5 z-30 flex gap-1.5 flex-wrap max-w-[220px] emoji-picker-container animate-in fade-in slide-in-from-top-2 duration-150">
             {['😀', '😂', '🔥', '👍', '❤️', '🎉', '🚀', '👀', '💯', '✨', '💻', '🙌', '✅'].map((emoji) => (
               <button
                 key={emoji}
