@@ -1,7 +1,21 @@
 import { useRef, useEffect, useState } from 'react';
-import { X, MessageSquare, Send, ArrowDown } from 'lucide-react';
-import type { ChatMessage } from '@/types';
+import { X, MessageSquare, Send, ArrowDown, Megaphone } from 'lucide-react';
+import type { ChatMessage, WorkspaceMember, Channel, DMChannel } from '@/types';
 import MessageItem from './MessageItem';
+import { useQuery } from '@tanstack/react-query';
+import { useChatStore } from '@/store/useChatStore';
+import api from '@/lib/api';
+import { getAvatarGradient } from '@/lib/utils';
+
+interface SuggestionItem {
+  type: 'special' | 'user';
+  id: string;
+  label: string;
+  email?: string;
+  description?: string;
+  isOnline?: boolean;
+  inChannel?: boolean;
+}
 
 interface ThreadSidebarProps {
   parentMessage: ChatMessage & { replies?: ChatMessage[] };
@@ -24,6 +38,137 @@ export default function ThreadSidebar({
   const inputRef = useRef<HTMLInputElement>(null);
   const isInitialLoad = useRef(true);
 
+  const { activeWorkspaceId } = useChatStore();
+
+  // Autocomplete state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStartIndex, setMentionStartIndex] = useState<number>(-1);
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
+
+  // Fetch workspace members
+  const { data: members = [] } = useQuery<WorkspaceMember[]>({
+    queryKey: ['workspace-members', activeWorkspaceId],
+    queryFn: async () => {
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/members`);
+      return res.data;
+    },
+    enabled: !!activeWorkspaceId,
+  });
+
+  // Fetch channels list
+  const { data: channels = [] } = useQuery<Channel[]>({
+    queryKey: ['channels', activeWorkspaceId],
+    queryFn: async () => {
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/channels`);
+      return res.data;
+    },
+    enabled: !!activeWorkspaceId,
+  });
+
+  // Fetch active DM channels
+  const { data: dmChannels = [] } = useQuery<DMChannel[]>({
+    queryKey: ['dms', activeWorkspaceId],
+    queryFn: async () => {
+      if (!activeWorkspaceId) return [];
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/dms`);
+      return res.data;
+    },
+    enabled: !!activeWorkspaceId,
+  });
+
+  const activeChannel = channels.find((c) => c.id === parentMessage.channel_id);
+  const activeDmChannel = dmChannels.find((d) => d.id === parentMessage.channel_id);
+
+  // Fetch private channel members
+  const { data: channelMembers = [] } = useQuery<any[]>({
+    queryKey: ['channel-members', parentMessage.channel_id],
+    queryFn: async () => {
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/channels/${parentMessage.channel_id}/members`);
+      return res.data;
+    },
+    enabled: !!activeWorkspaceId && !!parentMessage.channel_id && !!activeChannel?.is_private,
+  });
+
+  const isMemberInActiveChannel = (userId: string) => {
+    if (!parentMessage.channel_id) return true;
+    if (activeDmChannel) {
+      return userId === activeDmChannel.user_one_id || userId === activeDmChannel.user_two_id;
+    }
+    if (activeChannel?.is_private) {
+      return channelMembers.some((cm) => cm.user_id === userId);
+    }
+    return true;
+  };
+
+  const checkMention = (val: string, cursorOffset: number) => {
+    const textBeforeCursor = val.substring(0, cursorOffset);
+    const match = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9_\u00C0-\u1EF9]*)$/);
+    if (match) {
+      const query = match[1];
+      const startIndex = textBeforeCursor.length - match[0].trimStart().length;
+      return { query, startIndex };
+    }
+    return null;
+  };
+
+  const updateMentionStatus = (val: string, cursorOffset: number | null) => {
+    if (cursorOffset === null) {
+      setMentionQuery(null);
+      return;
+    }
+    const check = checkMention(val, cursorOffset);
+    if (check) {
+      setMentionQuery(check.query);
+      setMentionStartIndex(check.startIndex);
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setContent(val);
+    const cursor = e.target.selectionStart;
+    updateMentionStatus(val, cursor);
+    setSelectedIndex(0);
+  };
+
+  const handleSelectSuggestion = (item: SuggestionItem) => {
+    if (mentionQuery === null) return;
+    const cursor = inputRef.current?.selectionStart ?? content.length;
+    const beforeMention = content.substring(0, mentionStartIndex);
+    const afterMention = content.substring(cursor);
+    const mentionText = `@${item.label} `;
+    const newText = beforeMention + mentionText + afterMention;
+    setContent(newText);
+    setMentionQuery(null);
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        const newCursorPos = mentionStartIndex + mentionText.length;
+        inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 10);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mentionQuery !== null && filteredSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % filteredSuggestions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSelectSuggestion(filteredSuggestions[selectedIndex]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+      }
+    }
+  };
+
   // Auto scroll replies
   const repliesCount = parentMessage.replies?.length || 0;
   useEffect(() => {
@@ -31,7 +176,6 @@ export default function ThreadSidebar({
     if (!container) return;
 
     if (isInitialLoad.current) {
-      // Scroll to bottom instantly on first load
       setTimeout(() => {
         container.scrollTop = container.scrollHeight;
       }, 50);
@@ -46,7 +190,6 @@ export default function ThreadSidebar({
       container.scrollTop = container.scrollHeight;
       setShowNewRepliesBadge(false);
     } else {
-      // Show badge if last reply is from someone else
       const lastReply = parentMessage.replies?.[parentMessage.replies.length - 1];
       if (lastReply && lastReply.user_id !== currentUser?.id) {
         setShowNewRepliesBadge(true);
@@ -73,14 +216,15 @@ export default function ThreadSidebar({
 
   // Close sidebar on Escape key
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const handleKeyDownEsc = (e: KeyboardEvent) => {
+      // Only close if not inside autocomplete selection
+      if (e.key === 'Escape' && mentionQuery === null) {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+    window.addEventListener('keydown', handleKeyDownEsc);
+    return () => window.removeEventListener('keydown', handleKeyDownEsc);
+  }, [onClose, mentionQuery]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +232,70 @@ export default function ThreadSidebar({
     onSendReply(content);
     setContent('');
   };
+
+  // Build suggestions
+  const allSuggestions: SuggestionItem[] = [];
+  if (!activeDmChannel) {
+    allSuggestions.push({
+      type: 'special',
+      id: 'here',
+      label: 'here',
+      description: 'Notify every online member in this channel.',
+    });
+    allSuggestions.push({
+      type: 'special',
+      id: 'channel',
+      label: 'channel',
+      description: 'Notify everyone in this channel.',
+    });
+  }
+
+  const presenceUsers = useChatStore((state) => state.presenceUsers);
+  members.forEach((m) => {
+    if (m.user && m.user.id !== currentUser?.id) {
+      const isOnline = presenceUsers[m.user.username] === 'online';
+      allSuggestions.push({
+        type: 'user',
+        id: m.user.id,
+        label: m.user.username,
+        email: m.user.email,
+        isOnline,
+        inChannel: isMemberInActiveChannel(m.user.id),
+      });
+    }
+  });
+
+  const query = mentionQuery ? mentionQuery.toLowerCase() : '';
+  const filteredSuggestions = mentionQuery !== null
+    ? allSuggestions
+        .filter((item) => {
+          if (item.type === 'special') {
+            return item.label.toLowerCase().includes(query) || (item.description && item.description.toLowerCase().includes(query));
+          }
+          return (
+            item.label.toLowerCase().includes(query) ||
+            (item.email && item.email.toLowerCase().includes(query))
+          );
+        })
+        .sort((a, b) => {
+          const aPrefix = a.label.toLowerCase().startsWith(query);
+          const bPrefix = b.label.toLowerCase().startsWith(query);
+          if (aPrefix && !bPrefix) return -1;
+          if (!aPrefix && bPrefix) return 1;
+
+          const aInChannel = a.inChannel !== false;
+          const bInChannel = b.inChannel !== false;
+          if (aInChannel && !bInChannel) return -1;
+          if (!aInChannel && bInChannel) return 1;
+
+          const aOnline = a.isOnline || a.type === 'special';
+          const bOnline = b.isOnline || b.type === 'special';
+          if (aOnline && !bOnline) return -1;
+          if (!aOnline && bOnline) return 1;
+
+          return a.label.localeCompare(b.label);
+        })
+    : [];
 
   return (
     <div className="w-[360px] sm:w-[380px] md:w-[400px] border-l border-zinc-950 bg-zinc-900 flex flex-col h-full shrink-0 z-20 animate-in slide-in-from-right duration-250 relative">
@@ -171,14 +379,95 @@ export default function ThreadSidebar({
       {/* Dedicated Thread Message Input */}
       <form 
         onSubmit={handleSubmit} 
-        className="p-4 border-t border-zinc-950 bg-zinc-900/40 backdrop-blur-md"
+        className="p-4 border-t border-zinc-950 bg-zinc-900/40 backdrop-blur-md relative"
       >
+        {/* Mention Auto-complete popover */}
+        {mentionQuery !== null && filteredSuggestions.length > 0 && (
+          <div className="absolute bottom-full left-4 right-4 mb-2 bg-zinc-950/95 backdrop-blur-md border border-zinc-800/80 rounded-2xl shadow-2xl overflow-hidden max-h-[200px] overflow-y-auto z-30 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="flex flex-col">
+              {filteredSuggestions.map((item, idx) => {
+                const isSelected = idx === selectedIndex;
+                const isSpecial = item.type === 'special';
+                const isInChannel = item.inChannel !== false;
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectSuggestion(item)}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors duration-150 border-b border-zinc-900/50 last:border-0 ${
+                      isSelected ? 'bg-zinc-800/80 text-white' : 'text-zinc-300 hover:bg-zinc-900/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {isSpecial ? (
+                        <div className="w-6 h-6 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                          <Megaphone className="w-3.5 h-3.5" />
+                        </div>
+                      ) : (
+                        <div className="relative shrink-0">
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[10px] text-white border border-white/5 shadow-sm ${getAvatarGradient(item.label)}`}>
+                            {item.label.slice(0, 1).toUpperCase()}
+                          </div>
+                          <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-zinc-950 ${
+                            item.isOnline ? 'bg-emerald-500' : 'bg-zinc-550'
+                          }`} />
+                        </div>
+                      )}
+
+                      <div className="flex flex-col min-w-0 text-left">
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-[11px] truncate">
+                            {isSpecial ? `@${item.label}` : item.label}
+                          </span>
+                          {!isSpecial && item.isOnline && (
+                            <span className="w-1 h-1 rounded-full bg-emerald-500 inline-block" />
+                          )}
+                        </div>
+                        <span className="text-[9px] text-zinc-500 truncate">
+                          {isSpecial ? item.description : item.email}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {!isInChannel && (
+                        <span className="text-[8px] font-semibold text-zinc-500 tracking-wide uppercase px-1.5 py-0.5 bg-zinc-900 border border-zinc-850 rounded-md shadow-sm">
+                          {activeDmChannel ? 'Không có trong DM' : 'Không có trong kênh'}
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span className="text-[8px] font-mono text-zinc-450 bg-zinc-900 border border-zinc-850 px-1 py-0.5 rounded shadow-sm">
+                          Enter
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2 bg-zinc-950 border border-zinc-850 rounded-xl p-1.5 focus-within:border-indigo-500/40 focus-within:ring-1 focus-within:ring-indigo-500/20 transition duration-200">
           <input
             ref={inputRef}
             type="text"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleTextChange}
+            onKeyDown={handleKeyDown}
+            onKeyUp={(e) => {
+              const cursor = (e.target as HTMLInputElement).selectionStart;
+              updateMentionStatus(content, cursor);
+            }}
+            onSelect={(e) => {
+              const cursor = (e.target as HTMLInputElement).selectionStart;
+              updateMentionStatus(content, cursor);
+            }}
+            onClick={(e) => {
+              const cursor = (e.target as HTMLInputElement).selectionStart;
+              updateMentionStatus(content, cursor);
+            }}
             placeholder={`Trả lời @${parentMessage.username}...`}
             className="flex-1 bg-transparent px-3 py-1.5 text-sm text-white placeholder-zinc-500 outline-none border-0 min-w-0"
           />

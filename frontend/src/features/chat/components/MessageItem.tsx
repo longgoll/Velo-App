@@ -1,12 +1,81 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { ChatMessage } from '@/types';
+import type { ChatMessage, WorkspaceMember } from '@/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CornerUpLeft, FileIcon, ArrowDownToLine, Loader2, MessageSquare, PhoneCall, Video, Copy, Check, FileText, FileCode, FileSpreadsheet, FileAudio, X } from 'lucide-react';
 import { getAvatarGradient } from '@/lib/utils';
 import { useChatStore } from '@/store/useChatStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+
+const renderTextWithMentions = (content: string, members: WorkspaceMember[]) => {
+  if (!content) return content;
+
+  // Extract all unique usernames and special terms
+  const terms = new Set<string>();
+  terms.add('here');
+  terms.add('channel');
+  terms.add('all');
+  members.forEach((m) => {
+    if (m.user?.username) {
+      terms.add(m.user.username);
+    }
+  });
+
+  // Convert to array and sort by length descending
+  const sortedTerms = Array.from(terms).sort((a, b) => b.length - a.length);
+
+  if (sortedTerms.length === 0) return content;
+
+  // Escape special characters in usernames for regex safety
+  const escapedTerms = sortedTerms.map((t) => t.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+  
+  // Regex to match (?:^|\s)@(term1|term2|...)
+  const regex = new RegExp(`(^|\\s)@(${escapedTerms.join('|')})(?=\\b|\\s|$)`, 'g');
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+    const matchIndex = match.index;
+    const prefix = match[1];
+    const term = match[2];
+
+    // Add preceding text
+    if (matchIndex > lastIndex) {
+      parts.push(content.substring(lastIndex, matchIndex));
+    }
+
+    // Add prefix space
+    if (prefix) {
+      parts.push(prefix);
+    }
+
+    // Add mention pill tag
+    const isSpecial = term === 'here' || term === 'channel' || term === 'all';
+    parts.push(
+      <span
+        key={matchIndex}
+        className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold select-all mx-0.5 transition active:scale-95 duration-100 ${
+          isSpecial
+            ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 cursor-pointer'
+            : 'bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 cursor-pointer'
+        }`}
+      >
+        @{term}
+      </span>
+    );
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push(content.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : content;
+};
 
 interface ExtendedChatMessage extends ChatMessage {
   parentId?: string;
@@ -121,6 +190,17 @@ export default function MessageItem({
   // Retrieve current user from local storage
   const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+
+  const activeWorkspaceId = useChatStore((state) => state.activeWorkspaceId);
+
+  const { data: members = [] } = useQuery<WorkspaceMember[]>({
+    queryKey: ['workspace-members', activeWorkspaceId],
+    queryFn: async () => {
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/members`);
+      return res.data;
+    },
+    enabled: !!activeWorkspaceId,
+  });
 
   const [copied, setCopied] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -337,7 +417,7 @@ export default function MessageItem({
 
     return (
       <p className="text-zinc-300 text-sm mt-1 select-text break-words leading-relaxed">
-        {msg.content}
+        {renderTextWithMentions(msg.content, members)}
       </p>
     );
   };
