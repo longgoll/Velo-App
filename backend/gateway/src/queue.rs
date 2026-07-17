@@ -88,11 +88,13 @@ impl QueueManager {
     pub async fn publish_presence(&self, username: &str, status: &str) -> Result<(), redis::RedisError> {
         let mut conn = self.redis_client.get_multiplexed_tokio_connection().await?;
         
-        if status == "online" {
+        if status == "online" || status == "idle" || status == "dnd" {
             conn.sadd::<_, _, ()>("online_users", username).await?;
         } else {
             conn.srem::<_, _, ()>("online_users", username).await?;
         }
+        
+        conn.hset::<_, _, _, ()>("user_status_map", username, status).await?;
 
         let msg = PresenceMessage {
             username: username.to_string(),
@@ -102,6 +104,13 @@ impl QueueManager {
         
         conn.publish::<_, _, ()>("presence:global", payload).await?;
         Ok(())
+    }
+
+    // Lấy trạng thái cụ thể của user từ Valkey
+    pub async fn get_user_status(&self, username: &str) -> Result<String, redis::RedisError> {
+        let mut conn = self.redis_client.get_multiplexed_tokio_connection().await?;
+        let status: Option<String> = conn.hget("user_status_map", username).await?;
+        Ok(status.unwrap_or_else(|| "online".to_string()))
     }
 
     // Lấy danh sách các user đang online hiện tại

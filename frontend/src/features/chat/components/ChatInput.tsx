@@ -254,7 +254,8 @@ export default function ChatInput({
   const presenceUsers = useChatStore((state) => state.presenceUsers);
   members.forEach((m) => {
     if (m.user && m.user.id !== currentUser?.id) {
-      const isOnline = presenceUsers[m.user.username] === 'online';
+      const status = presenceUsers[m.user.username];
+      const isOnline = status === 'online' || status === 'idle' || status === 'dnd';
       allSuggestions.push({
         type: 'user',
         id: m.user.id,

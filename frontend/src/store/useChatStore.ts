@@ -26,7 +26,7 @@ interface ChatStore {
   voiceDeafened: boolean;
   recentConversations: RecentConversation[];
   typingUsers: Record<string, Record<string, number>>;
-  presenceUsers: Record<string, 'online' | 'offline'>;
+  presenceUsers: Record<string, string>;
   lastRead: Record<string, number>;
 
   // Modal open states
@@ -47,8 +47,10 @@ interface ChatStore {
   setVoiceDeafened: (deafened: boolean) => void;
   addRecentConversation: (id: string, type: 'channel' | 'dm', workspaceId: string) => void;
   setTypingUser: (channelId: string, username: string, timestamp: number) => void;
-  setUserPresence: (username: string, status: 'online' | 'offline') => void;
+  setUserPresence: (username: string, status: string) => void;
   setOnlineUsers: (usernames: string[]) => void;
+  sendJsonMessage: ((msg: any) => void) | null;
+  setSendJsonMessage: (fn: ((msg: any) => void) | null) => void;
   loadUserContext: (userId: string) => void;
   logout: () => void;
 
@@ -115,6 +117,8 @@ export const useChatStore = create<ChatStore>((set) => ({
     }
     return [];
   })(),
+
+  sendJsonMessage: null,
 
   // Modals state
   showCreateWs: false,
@@ -243,13 +247,14 @@ export const useChatStore = create<ChatStore>((set) => ({
   setUserPresence: (username, status) => set((state) => ({
     presenceUsers: { ...state.presenceUsers, [username]: status }
   })),
-  setOnlineUsers: (usernames) => set((state) => {
-    const presence: Record<string, 'online' | 'offline'> = {};
+  setOnlineUsers: (usernames) => set(() => {
+    const presence: Record<string, string> = {};
     usernames.forEach((name) => {
       presence[name] = 'online';
     });
     return { presenceUsers: presence };
   }),
+  setSendJsonMessage: (fn) => set({ sendJsonMessage: fn }),
   loadUserContext: (userId) => {
     try {
       const storedRecent = localStorage.getItem(`recentConversations_${userId}`);

@@ -24,6 +24,8 @@ pub enum ClientMsg {
     SendMessage { channel_id: String, content: String },
     #[serde(rename = "typing")]
     Typing { channel_id: String },
+    #[serde(rename = "set_status")]
+    SetStatus { status: String },
 }
 
 #[derive(Serialize, Clone)]
@@ -84,16 +86,41 @@ async fn handle_socket(
     // 1. Gửi danh sách user online hiện tại cho client mới kết nối
     match state.queue_manager.get_online_users().await {
         Ok(users) => {
-            let _ = tx_out.send(ServerMsg::OnlineList(users)).await;
+            let _ = tx_out.send(ServerMsg::OnlineList(users.clone())).await;
+
+            // Gửi thông tin trạng thái chi tiết của từng online user đến client mới kết nối này
+            let queue = state.queue_manager.clone();
+            let tx_out_clone = tx_out.clone();
+            tokio::spawn(async move {
+                for user in users {
+                    if let Ok(status) = queue.get_user_status(&user).await {
+                        let _ = tx_out_clone.send(ServerMsg::UserStatus {
+                            username: user,
+                            status,
+                        }).await;
+                    }
+                }
+            });
         }
         Err(e) => {
             error!("Failed to get online users list from Valkey: {:?}", e);
         }
     }
 
-    // 2. Phát trạng thái "online" của user này tới mọi người
-    if let Err(e) = state.queue_manager.publish_presence(&username, "online").await {
-        error!("Failed to publish online presence: {:?}", e);
+    // 2. Phát trạng thái hiện tại của user này tới mọi người (mặc định là online nếu chưa có)
+    let initial_status = match state.queue_manager.get_user_status(&username).await {
+        Ok(s) => {
+            if s == "offline" {
+                "online".to_string()
+            } else {
+                s
+            }
+        }
+        _ => "online".to_string(),
+    };
+
+    if let Err(e) = state.queue_manager.publish_presence(&username, &initial_status).await {
+        error!("Failed to publish presence: {:?}", e);
     }
 
     // Writer Task: Nhận ServerMsg từ rx_out và gửi về client qua WebSocket
@@ -222,6 +249,11 @@ async fn handle_socket(
                                 }
                             }
                             _ => {}
+                        }
+                    }
+                    ClientMsg::SetStatus { status } => {
+                        if let Err(e) = state_clone.queue_manager.publish_presence(&username_clone, &status).await {
+                            error!("Failed to publish presence change: {:?}", e);
                         }
                     }
                 }

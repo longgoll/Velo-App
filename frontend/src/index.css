@@ -211,7 +211,7 @@ body {
   background-color: #f2f3f5 !important;
 }
 .light .bg-zinc-950\/90 {
-  background-color: #e3e5e8 !important;
+  background-color: #ebedf0 !important;
 }
 .light .bg-zinc-800 {
   background-color: #e3e5e8 !important;
@@ -263,9 +263,30 @@ body {
 }
 
 /* Specific elements that need clear light modes */
-.light div.w-\[64px\] {
-  background-color: var(--bg-app-sidebar) !important;
-  border-right-color: var(--border-app) !important;
+.light div.w-\[64px\].bg-zinc-950 {
+  background-color: #e3e5e8 !important;
+  border-right-color: #e3e5e8 !important;
+}
+.light div.w-\[64px\] button.bg-indigo-600 {
+  background-color: #5865F2 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  border-radius: 12px !important;
+}
+.light div.w-\[64px\] button.text-zinc-500:hover {
+  background-color: #5865F2 !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+}
+.light div.w-\[64px\] button.bg-indigo-600\/10 {
+  background-color: #ffffff !important;
+  color: #5865F2 !important;
+  border-color: transparent !important;
+}
+.light div.w-\[64px\] button.bg-indigo-600\/10:hover {
+  background-color: #5865F2 !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
 }
 .light div.w-\[240px\] {
   background-color: var(--bg-app-sidebar) !important;

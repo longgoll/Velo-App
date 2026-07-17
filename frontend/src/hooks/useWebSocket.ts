@@ -16,6 +16,7 @@ interface ChatMessage {
 export const useWebSocket = (token: string | null) => {
   const socketRef = useRef<WebSocket | null>(null);
   const queryClient = useQueryClient();
+  const setSendJsonMessage = useChatStore((state) => state.setSendJsonMessage);
   const { activeChannelId } = useChatStore();
   const activeChannelIdRef = useRef(activeChannelId);
   const subscribedChannelsRef = useRef<Set<string>>(new Set());
@@ -87,6 +88,14 @@ export const useWebSocket = (token: string | null) => {
     ws.onopen = () => {
       if (socketRef.current !== ws) return;
       console.log('WebSocket connected successfully');
+      
+      // Gửi trạng thái lưu trữ của user ngay khi kết nối thành công
+      const storedStatus = localStorage.getItem('user_presence_status') || 'online';
+      ws.send(JSON.stringify({
+        type: 'set_status',
+        payload: { status: storedStatus }
+      }));
+      
       subscribeToAllChannels();
     };
 
@@ -283,6 +292,24 @@ export const useWebSocket = (token: string | null) => {
       Notification.requestPermission();
     }
   }, []);
+
+  // Đăng ký callback gửi JSON lên websocket vào chat store
+  const sendJson = useCallback((msg: any) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify(msg));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (token) {
+      setSendJsonMessage(sendJson);
+    } else {
+      setSendJsonMessage(null);
+    }
+    return () => {
+      setSendJsonMessage(null);
+    };
+  }, [token, sendJson, setSendJsonMessage]);
 
   return { sendMessage, sendTyping };
 };
