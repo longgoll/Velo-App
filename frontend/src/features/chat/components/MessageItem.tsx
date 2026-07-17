@@ -34,6 +34,7 @@ interface MessageItemProps {
   unreadTimestamp?: string | number | null;
   isActiveThread?: boolean;
   hideReply?: boolean;
+  isHighlighted?: boolean;
 }
 
 // Safe timestamp conversion helper — hoisted ra ngoài component
@@ -50,6 +51,7 @@ function MessageItemInner({
   unreadTimestamp = null,
   isActiveThread = false,
   hideReply = false,
+  isHighlighted = false,
 }: MessageItemProps) {
   const currentUser = useCurrentUser();
 
@@ -159,10 +161,13 @@ function MessageItemInner({
         </div>
       )}
       {/* 2. Main Message Container */}
-      <div className={`flex gap-4 items-start group p-2 rounded-xl transition duration-150 relative w-full ${isActiveThread
+      <div className={`flex gap-4 items-start group p-2 rounded-xl transition duration-150 relative w-full ${
+        isHighlighted
+          ? 'bg-amber-500/10 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse'
+          : isActiveThread
           ? 'bg-indigo-950/25 border border-indigo-500/25 shadow-[inset_0_0_8px_rgba(99,102,241,0.04)]'
           : 'hover:bg-zinc-800/10 border border-transparent'
-        }`}>
+      }`}>
         <Avatar size="lg" className="shrink-0">
           <AvatarFallback className={`font-bold select-none text-sm shadow-inner ${getAvatarGradient(msg.username)}`}>
             {msg.username.slice(0, 1).toUpperCase()}

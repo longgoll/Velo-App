@@ -540,7 +540,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
 
             {/* Folder-Tree Channels Structure */}
             {activeWorkspaceId ? (
-              <ScrollArea className="flex-1 px-2 py-3">
+              <ScrollArea className="flex-1 min-h-0 px-2 py-3">
                 <div className="space-y-4">
                   {/* Folder 1: Text Channels */}
                   <div>
@@ -663,7 +663,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 px-2 py-2">
+            <ScrollArea className="flex-1 min-h-0 px-2 py-2">
               <div className="space-y-0.5">
                 {dmSearch ? (
                   /* Searching users in workspace to DM */
@@ -731,7 +731,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
                 <MessageSquare className="w-4 h-4 text-zinc-500" />
               </div>
 
-              <ScrollArea className="flex-1 px-2 py-3">
+              <ScrollArea className="flex-1 min-h-0 px-2 py-3">
                 <div className="space-y-4">
                   {/* Dashboard link */}
                   <div>

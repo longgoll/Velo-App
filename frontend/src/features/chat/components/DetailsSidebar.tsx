@@ -15,9 +15,10 @@ interface DetailsSidebarProps {
   onClose: () => void;
   messages: ChatMessage[];
   onOpenSettings?: () => void;
+  onOpenPins?: () => void;
 }
 
-export default function DetailsSidebar({ onClose, messages, onOpenSettings }: DetailsSidebarProps) {
+export default function DetailsSidebar({ onClose, messages, onOpenSettings, onOpenPins }: DetailsSidebarProps) {
   const { activeWorkspaceId, activeChannelId, presenceUsers } = useChatStore();
   const [isMuted, setIsMuted] = useState(false);
 
@@ -134,7 +135,12 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
   };
 
   const handlePinClick = () => {
-    toast.info('Tính năng ghim tin nhắn sẽ sớm ra mắt!');
+    if (onOpenPins) {
+      onOpenPins();
+      onClose();
+    } else {
+      toast.info('Tính năng ghim tin nhắn sẽ sớm ra mắt!');
+    }
   };
 
   const handleMembersClick = () => {
@@ -145,22 +151,39 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
   const isOwnerOrAdmin = myRole === 'owner' || myRole === 'admin';
 
   return (
-    <div className="w-[320px] border-l border-zinc-200 dark:border-zinc-950/60 bg-zinc-900/95 flex flex-col h-full shrink-0 z-20 animate-in slide-in-from-right duration-255 relative select-none">
+    <div 
+      className="w-[320px] border-l flex flex-col h-full shrink-0 z-20 animate-in slide-in-from-right duration-255 relative select-none"
+      style={{
+        backgroundColor: 'var(--bg-app-chat)',
+        borderColor: 'var(--border-app)'
+      }}
+    >
       {/* Header */}
-      <div className="px-4 h-[52px] border-b border-zinc-200 dark:border-zinc-950 flex items-center justify-between bg-white dark:bg-zinc-900/40 backdrop-blur-md shrink-0">
+      <div 
+        className="px-4 h-[52px] border-b flex items-center justify-between shrink-0"
+        style={{
+          backgroundColor: 'var(--bg-app-chat)',
+          borderColor: 'var(--border-app)'
+        }}
+      >
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-indigo-400" />
-          <span className="font-bold text-white text-sm">Thông tin nhóm</span>
+          <span 
+            className="font-bold text-sm"
+            style={{ color: 'var(--text-app-primary)' }}
+          >
+            Thông tin nhóm
+          </span>
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 hover:bg-zinc-800 text-zinc-500 hover:text-white rounded-lg transition border-0 outline-none cursor-pointer"
+          className="p-1.5 hover:bg-zinc-800 text-zinc-550 hover:text-white rounded-lg transition border-0 outline-none cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      <ScrollArea className="flex-1 px-4 py-6">
+      <ScrollArea className="flex-1 min-h-0 px-4 py-6">
         <div className="space-y-6">
           {/* Main Info */}
           <div className="flex flex-col items-center text-center">
@@ -176,10 +199,15 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
               </div>
             )}
 
-            <h2 className="text-base font-bold text-white mt-4 tracking-tight truncate max-w-[260px]">{title}</h2>
+            <h2 
+              className="text-base font-bold mt-4 tracking-tight truncate max-w-[260px]"
+              style={{ color: 'var(--text-app-primary)' }}
+            >
+              {title}
+            </h2>
             <p className="text-[11px] text-zinc-500 font-medium mt-1 uppercase tracking-wider">{subTitle}</p>
             {!isDm && (
-              <div className="mt-2 text-[10px] bg-zinc-950/40 border border-zinc-850 px-2 py-0.5 rounded-full text-zinc-400 font-semibold">
+              <div className="mt-2 text-[10px] bg-zinc-100 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-850 px-2 py-0.5 rounded-full text-zinc-600 dark:text-zinc-400 font-semibold">
                 {visibleMembers.length} thành viên
               </div>
             )}
@@ -192,7 +220,7 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
               className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all text-xs font-semibold cursor-pointer outline-none ${
                 isMuted
                   ? 'bg-rose-500/10 border-rose-500/20 text-rose-450 hover:bg-rose-500/20'
-                  : 'bg-zinc-950/30 border-zinc-850 text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200'
+                  : 'bg-zinc-100 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-850 text-zinc-650 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-200'
               }`}
               title={isMuted ? 'Bật thông báo' : 'Tắt tiếng'}
             >
@@ -202,7 +230,7 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
 
             <button
               onClick={handlePinClick}
-              className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-zinc-950/30 border border-zinc-850 text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200 transition-all text-xs font-semibold cursor-pointer outline-none"
+              className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-zinc-100 dark:bg-zinc-950/30 border border-zinc-200 dark:border-zinc-850 text-zinc-655 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-200 transition-all text-xs font-semibold cursor-pointer outline-none"
             >
               <Pin className="w-4 h-4" />
               <span className="text-[9px]">Đã ghim</span>
@@ -210,7 +238,7 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
 
             <button
               onClick={handleMembersClick}
-              className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-zinc-950/30 border border-zinc-850 text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200 transition-all text-xs font-semibold cursor-pointer outline-none"
+              className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-zinc-100 dark:bg-zinc-950/30 border border-zinc-200 dark:border-zinc-850 text-zinc-655 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-855 hover:text-zinc-900 dark:hover:text-zinc-200 transition-all text-xs font-semibold cursor-pointer outline-none"
             >
               <Users className="w-4 h-4" />
               <span className="text-[9px]">Thành viên</span>
@@ -225,14 +253,17 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
                 }
               }}
               disabled={!isOwnerOrAdmin && !isDm}
-              className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-zinc-950/30 border border-zinc-850 text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200 disabled:opacity-40 disabled:hover:bg-zinc-950/30 disabled:cursor-not-allowed transition-all text-xs font-semibold cursor-pointer outline-none"
+              className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-zinc-100 dark:bg-zinc-950/30 border border-zinc-200 dark:border-zinc-850 text-zinc-655 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-855 hover:text-zinc-900 dark:hover:text-zinc-200 disabled:opacity-40 disabled:hover:bg-zinc-100 dark:disabled:hover:bg-zinc-950/30 disabled:cursor-not-allowed transition-all text-xs font-semibold cursor-pointer outline-none"
             >
               <Settings className="w-4 h-4" />
               <span className="text-[9px]">Cài đặt</span>
             </button>
           </div>
 
-          <div className="border-t border-zinc-950/60 my-2" />
+          <div 
+            className="border-t my-2" 
+            style={{ borderColor: 'var(--border-app)' }}
+          />
 
           {/* Members List */}
           <div>
@@ -255,7 +286,7 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
                         <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-zinc-900 ${getStatusColor(status)}`} />
                       </div>
                       <div className="text-left min-w-0">
-                        <div className="text-xs font-semibold text-zinc-200 truncate">{m.user.username}</div>
+                        <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{m.user.username}</div>
                         {m.role !== 'member' && (
                           <div className="text-[8px] text-indigo-400 font-bold uppercase tracking-wider mt-0.5">
                             {m.role === 'owner' ? 'Chủ sở hữu' : 'Quản trị'}
@@ -282,7 +313,7 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
                     href={img.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="relative aspect-square rounded-lg overflow-hidden border border-zinc-850 hover:border-zinc-700 transition"
+                    className="relative aspect-square rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-850 hover:border-zinc-400 dark:hover:border-zinc-700 transition"
                   >
                     <img src={img.url} alt={img.fileName} className="w-full h-full object-cover" />
                   </a>
@@ -305,13 +336,13 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
                     target="_blank"
                     rel="noreferrer"
                     download
-                    className="flex items-center gap-2.5 p-2 bg-zinc-950/20 border border-zinc-850 rounded-xl hover:bg-zinc-950/40 hover:border-zinc-750 transition text-left group"
+                    className="flex items-center gap-2.5 p-2 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-850 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-950/40 hover:border-zinc-300 dark:hover:border-zinc-750 transition text-left group"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-850 flex items-center justify-center text-zinc-500 shrink-0 group-hover:text-indigo-400">
+                    <div className="w-8 h-8 rounded-lg bg-zinc-200 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-850 flex items-center justify-center text-zinc-550 dark:text-zinc-500 shrink-0 group-hover:text-indigo-400 transition-colors">
                       <FileText className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-semibold text-zinc-300 truncate group-hover:text-white transition-colors">
+                      <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 truncate group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
                         {file.fileName}
                       </div>
                       <div className="text-[9px] text-zinc-500 font-mono mt-0.5">{file.size}</div>
@@ -335,12 +366,12 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
                     href={link.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center justify-between p-2.5 bg-zinc-950/20 border border-zinc-850 rounded-xl hover:bg-zinc-950/40 hover:border-zinc-750 transition text-left group"
+                    className="flex items-center justify-between p-2.5 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-850 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-950/40 hover:border-zinc-300 dark:hover:border-zinc-750 transition text-left group"
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
-                      <Link2 className="w-4 h-4 text-zinc-500 shrink-0 group-hover:text-indigo-400" />
+                      <Link2 className="w-4 h-4 text-zinc-550 dark:text-zinc-500 shrink-0 group-hover:text-indigo-400 transition-colors" />
                       <div className="min-w-0">
-                        <div className="text-xs font-semibold text-zinc-300 truncate group-hover:text-white transition-colors">
+                        <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 truncate group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
                           {getDomainName(link.url)}
                         </div>
                         <div className="text-[9px] text-zinc-500 truncate mt-0.5">

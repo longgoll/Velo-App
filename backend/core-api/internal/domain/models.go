@@ -153,3 +153,22 @@ type MessageReaction struct {
 	Emoji     string    `gorm:"primaryKey;type:varchar(50)" json:"emoji"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type PinnedMessage struct {
+	ID        string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	ChannelID string    `gorm:"type:varchar(36);not null;index" json:"channel_id"`
+	MessageID string    `gorm:"type:varchar(36);not null" json:"message_id"`
+	PinnedBy  string    `gorm:"type:varchar(36);not null" json:"pinned_by"`
+	Content   string    `gorm:"type:text" json:"content"`
+	Username  string    `gorm:"type:varchar(100)" json:"username"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+
+	Pinner User `gorm:"foreignKey:PinnedBy" json:"pinner,omitempty"`
+}
+
+func (p *PinnedMessage) BeforeCreate(tx *gorm.DB) (err error) {
+	if p.ID == "" {
+		p.ID = uuid.New().String()
+	}
+	return
+}

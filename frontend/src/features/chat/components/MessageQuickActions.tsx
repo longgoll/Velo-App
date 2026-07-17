@@ -1,27 +1,42 @@
 import { useState, useEffect, useRef } from 'react';
-import { CornerUpLeft, Smile, Copy, Check } from 'lucide-react';
+import { CornerUpLeft, Smile, Copy, Check, Pin } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import api from '@/lib/api';
+import { useChatStore } from '@/store/useChatStore';
+import { toast } from '@/store/useToastStore';
 import type { ChatMessage, ReactionSummary } from '@/types';
 
 interface MessageQuickActionsProps {
   msg: ChatMessage;
   onReplyClick: (msg: ChatMessage) => void;
   hideReply?: boolean;
+  channelId?: string;
+  onPinSuccess?: () => void;
 }
 
 export function MessageQuickActions({
   msg,
   onReplyClick,
   hideReply = false,
+  channelId,
+  onPinSuccess,
 }: MessageQuickActionsProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+  const [isPinning, setIsPinning] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const currentUser = useCurrentUser();
+  const { activeWorkspaceId } = useChatStore();
+
+  // Check if user is admin/owner to show pin button
+  const { data: members = [] } = queryClient.getQueryData<any[]>(['workspace-members', activeWorkspaceId]) 
+    ? { data: queryClient.getQueryData<any[]>(['workspace-members', activeWorkspaceId]) || [] } 
+    : { data: [] };
+  const myRole = (members as any[]).find((m: any) => m.user_id === currentUser?.id)?.role || 'member';
+  const canPin = myRole === 'owner' || myRole === 'admin';
 
   useEffect(() => {
     if (!showPicker) return;
@@ -120,6 +135,26 @@ export function MessageQuickActions({
     setTimeout(() => setCopiedText(false), 2000);
   };
 
+  const handlePin = async () => {
+    const cId = channelId || msg.channel_id;
+    if (!cId) return;
+    setIsPinning(true);
+    try {
+      await api.post(`/channels/${cId}/pins`, {
+        message_id: msg.id,
+        content: msg.content,
+        username: msg.username,
+      });
+      queryClient.invalidateQueries({ queryKey: ['pins', cId] });
+      toast.success('Đã ghim tin nhắn!');
+      onPinSuccess?.();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Không thể ghim tin nhắn.');
+    } finally {
+      setIsPinning(false);
+    }
+  };
+
   return (
     <div className="relative">
       {/* Floating Quick Action Bar on Hover */}
@@ -175,6 +210,18 @@ export function MessageQuickActions({
           >
             {copiedText ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
           </button>
+
+          {/* Pin message (admin/owner only) */}
+          {canPin && (
+            <button
+              onClick={handlePin}
+              disabled={isPinning}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 transition active:scale-90 cursor-pointer border-0 outline-none disabled:opacity-50"
+              title="Ghim tin nhắn"
+            >
+              <Pin className="w-4 h-4" />
+            </button>
+          )}
         </div>
       )}
 

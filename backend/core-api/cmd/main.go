@@ -82,6 +82,7 @@ func main() {
 	channelRepo := postgres.NewChannelRepository(db)
 	messageRepo := scylla.NewMessageRepository(scyllaSession)
 	notificationRepo := postgres.NewNotificationRepository(db)
+	pinnedMessageRepo := postgres.NewPinnedMessageRepository(db)
 
 	// 5. Initialize UseCases
 	userUseCase := usecase.NewUserUseCase(userRepo, tokenMaker)
@@ -90,6 +91,7 @@ func main() {
 	messageUseCase := usecase.NewMessageUseCase(messageRepo, channelRepo, workspaceRepo, db, redisClient)
 	attachmentUseCase := usecase.NewAttachmentUseCase(minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)
 	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo)
+	pinnedMessageUseCase := usecase.NewPinnedMessageUseCase(pinnedMessageRepo)
 
 	// 5.5. Start Background Message Worker
 	msgWorker := worker.NewMessageWorker(db, redisClient, messageRepo, minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)
@@ -138,6 +140,7 @@ func main() {
 	httpDelivery.NewMessageHandler(api, authMiddleware, messageUseCase)
 	httpDelivery.NewAttachmentHandler(api, authMiddleware, attachmentUseCase)
 	httpDelivery.NewNotificationHandler(api, authMiddleware, notificationUseCase)
+	httpDelivery.NewPinnedMessageHandler(api, authMiddleware, pinnedMessageUseCase)
 
 	// Health Check
 	app.Get("/health", func(c *fiber.Ctx) error {

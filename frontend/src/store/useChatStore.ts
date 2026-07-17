@@ -29,6 +29,9 @@ interface ChatStore {
   presenceUsers: Record<string, string>;
   lastRead: Record<string, number>;
 
+  // scroll to a specific message after navigation
+  scrollToMessageId: string | null;
+
   // Modal open states
   showCreateWs: boolean;
   showJoinWs: boolean;
@@ -54,6 +57,7 @@ interface ChatStore {
   loadUserContext: (userId: string) => void;
   logout: () => void;
 
+  setScrollToMessageId: (id: string | null) => void;
   setShowCreateWs: (open: boolean) => void;
   setShowJoinWs: (open: boolean) => void;
   setShowCreateChan: (open: boolean) => void;
@@ -87,6 +91,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   voiceDeafened: false,
 
   presenceUsers: {},
+  scrollToMessageId: null,
   lastRead: (() => {
     if (typeof window !== 'undefined') {
       try {
@@ -247,6 +252,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     return { presenceUsers: presence };
   }),
   setSendJsonMessage: (fn) => set({ sendJsonMessage: fn }),
+  setScrollToMessageId: (id) => set({ scrollToMessageId: id }),
   loadUserContext: (userId) => {
     try {
       const storedRecent = localStorage.getItem(`recentConversations_${userId}`);

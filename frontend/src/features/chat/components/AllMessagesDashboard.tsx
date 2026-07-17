@@ -291,7 +291,7 @@ export default function AllMessagesDashboard({ onSendMessage }: AllMessagesDashb
       </div>
 
       {/* Content scroll area */}
-      <ScrollArea className="flex-1 px-8 py-6 z-10">
+      <ScrollArea className="flex-1 min-h-0 px-8 py-6 z-10">
         {/* ================== UNREAD MESSAGES TAB ================== */}
         {activeTab === 'unread' && (
           <div className="space-y-4 max-w-4xl mx-auto">

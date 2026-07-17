@@ -8,6 +8,9 @@ import type { Channel, ChatMessage, Workspace, DMChannel, WorkspaceMember } from
 import MessageItem from './MessageItem';
 import ThreadSidebar from './ThreadSidebar';
 import DetailsSidebar from './DetailsSidebar';
+import SearchPanel from './SearchPanel';
+import NotificationPanel from './NotificationPanel';
+import PinnedMessagesPanel from './PinnedMessagesPanel';
 import ChatInput from './ChatInput';
 import DynamicIslandCall from '../../../components/ui/DynamicIslandCall';
 import VoiceRoomView from './VoiceRoomView';
@@ -44,7 +47,9 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     setVoiceMuted,
     setVoiceDeafened,
     setActiveVoiceChannelId,
-    setActiveChannelId
+    setActiveChannelId,
+    scrollToMessageId,
+    setScrollToMessageId,
   } = useChatStore();
 
   const {
@@ -59,7 +64,11 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showPins, setShowPins] = useState(false);
   const [isCallMaximized, setIsCallMaximized] = useState(false);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
 
   // ✅ useCurrentUser hook thay vì JSON.parse mỗi render
   const currentUser = useCurrentUser();
@@ -299,8 +308,9 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
         }
       }, 50);
 
+      // Only scroll to bottom if we're NOT targeting a specific message (from search/notifications)
       setTimeout(() => {
-        if (parentRef.current) {
+        if (parentRef.current && !useChatStore.getState().scrollToMessageId) {
           parentRef.current.scrollTop = parentRef.current.scrollHeight;
         }
       }, 50);
@@ -368,6 +378,49 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
   useEffect(() => {
     return () => cancelAnimationFrame(scrollRAF.current);
   }, []);
+
+  // ✅ Scroll to specific message (from Search / Notifications) — two-step approach
+  useEffect(() => {
+    if (!scrollToMessageId || structuredMessages.length === 0) return;
+
+    const targetIndex = structuredMessages.findIndex((m) => m.id === scrollToMessageId);
+    if (targetIndex === -1) return;
+
+    const msgId = scrollToMessageId;
+
+    // Step 1: Tell virtualizer to jump to the approximate area (instant, not smooth)
+    rowVirtualizer.scrollToIndex(targetIndex, { align: 'center', behavior: 'auto' });
+
+    // Step 2: Retry until the DOM element is rendered, then precisely center it
+    let attempts = 0;
+    const tryScroll = () => {
+      const container = parentRef.current;
+      const el = container?.querySelector(`[data-msg-id="${msgId}"]`) as HTMLElement | null;
+
+      if (el && container) {
+        // Use getBoundingClientRect for accurate position in virtualized list
+        const elRect = el.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const elCenterOffset = elRect.top - containerRect.top + elRect.height / 2;
+        const containerCenter = container.clientHeight / 2;
+        const scrollDelta = elCenterOffset - containerCenter;
+
+        container.scrollTo({ top: container.scrollTop + scrollDelta, behavior: 'smooth' });
+
+        setHighlightedMsgId(msgId);
+        setScrollToMessageId(null);
+        setTimeout(() => setHighlightedMsgId(null), 2500);
+      } else if (attempts < 15) {
+        attempts++;
+        setTimeout(tryScroll, 80);
+      }
+    };
+
+    // Delay slightly so panel close animation completes before we scroll
+    const timer = setTimeout(tryScroll, 120);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollToMessageId, structuredMessages.length]);
 
   if (activeFilter === 'all' && !activeChannelId) {
     return <AllMessagesDashboard onSendMessage={handleSendMessage} />;
@@ -486,6 +539,14 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
           setActiveThreadId={setActiveThreadId}
           toggleExplorer={toggleExplorer}
           explorerOpen={explorerOpen}
+          showSearch={showSearch}
+          setShowSearch={setShowSearch}
+          showNotifications={showNotifications}
+          setShowNotifications={setShowNotifications}
+          showPins={showPins}
+          setShowPins={setShowPins}
+          activeChannelId={activeChannelId}
+          workspaceName={workspaces.find((w) => w.id === activeWorkspaceId)?.name}
         />
 
         {/* 3. Active call indicator banner */}
@@ -557,6 +618,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
                         contain: 'content',
                       }}
                       className="py-1 flex flex-col"
+                      data-msg-id={msg.id}
                     >
                       {isUnreadStart && (
                         <div className="flex items-center gap-2 my-2 select-none animate-in fade-in slide-in-from-top-1 duration-200 shrink-0">
@@ -573,6 +635,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
                         onReplyClick={handleReplyClick}
                         unreadTimestamp={unreadTimestamp}
                         isActiveThread={activeThreadId === msg.id}
+                        isHighlighted={highlightedMsgId === msg.id}
                       />
                     </div>
                   );
@@ -608,7 +671,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
         )}
       </div>
 
-      {/* Dynamic Right Sidebar Panel (Thread or Details) */}
+      {/* Dynamic Right Sidebar Panel (Thread, Details, Search, Notifications, Pins) */}
       {activeThreadMessage && !isCallMaximized ? (
         <ThreadSidebar
           parentMessage={activeThreadMessage}
@@ -622,6 +685,26 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
         <DetailsSidebar
           onClose={() => setShowDetails(false)}
           messages={messages}
+          onOpenPins={() => {
+            setShowDetails(false);
+            setShowPins(true);
+          }}
+        />
+      ) : showSearch && !isCallMaximized ? (
+        <SearchPanel
+          onClose={() => setShowSearch(false)}
+          onNavigateToChannel={(channelId) => {
+            useChatStore.getState().setActiveChannelId(channelId, 'channel', activeWorkspaceId || undefined);
+          }}
+        />
+      ) : showNotifications && !isCallMaximized ? (
+        <NotificationPanel
+          onClose={() => setShowNotifications(false)}
+        />
+      ) : showPins && !isCallMaximized ? (
+        <PinnedMessagesPanel
+          onClose={() => setShowPins(false)}
+          channelName={chatTitle}
         />
       ) : null}
     </div>
