@@ -1,22 +1,12 @@
 import { useChatStore } from '@/store/useChatStore';
 import type { SidebarFilter } from '@/store/useChatStore';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { LogOut, Sparkles, MessageSquare, Layers, Globe, Users, Settings } from 'lucide-react';
+import { Sparkles, MessageSquare, Layers, Globe, Users } from 'lucide-react';
 import api from '@/lib/api';
-import type { Workspace, UserData, Channel, DMChannel } from '@/types';
-import { Avatar, AvatarFallback, AvatarBadge } from '@/components/ui/avatar';
-import { getAvatarGradient } from '@/lib/utils';
+import type { Workspace, Channel, DMChannel } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface WorkspaceSidebarProps {
-  user: UserData | null;
-  onLogout: () => void;
-}
-
-export default function WorkspaceSidebar({
-  user,
-  onLogout,
-}: WorkspaceSidebarProps) {
+export default function WorkspaceSidebar() {
   const { 
     activeWorkspaceId, 
     activeFilter, 
@@ -177,61 +167,8 @@ export default function WorkspaceSidebar({
           </div>
         </div>
 
-        {/* Bottom: Settings, Logout, Avatar */}
-        <div className="flex flex-col gap-4 items-center w-full">
-          {/* Quick Settings */}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  className="w-10 h-10 bg-transparent rounded-xl flex items-center justify-center text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200 cursor-pointer transition outline-none border-0"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
-              }
-            />
-            <TooltipContent side="right">Cài đặt nhanh</TooltipContent>
-          </Tooltip>
-
-          {/* Logout */}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  onClick={onLogout}
-                  className="w-10 h-10 bg-transparent rounded-xl flex items-center justify-center text-zinc-500 hover:bg-red-950/20 hover:text-red-400 cursor-pointer transition outline-none border-0"
-                >
-                  <LogOut className="w-5 h-5" />
-                </button>
-              }
-            />
-            <TooltipContent side="right">Đăng xuất</TooltipContent>
-          </Tooltip>
-
-          <div className="w-8 h-[1px] bg-zinc-900" />
-
-          {/* Avatar Profile */}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button className="relative cursor-pointer focus:outline-none bg-transparent border-0 p-0">
-                  <Avatar size="lg" className="shadow-[0_0_12px_rgba(0,0,0,0.4)]">
-                    <AvatarFallback className={`font-semibold select-none text-xs ${getAvatarGradient(user?.username || '')}`}>
-                      {user?.username ? user.username.slice(0, 1).toUpperCase() : '?'}
-                    </AvatarFallback>
-                    <AvatarBadge className="bg-emerald-500 border-zinc-950 w-2.5 h-2.5" />
-                  </Avatar>
-                </button>
-              }
-            />
-            <TooltipContent side="right">
-              <div className="text-xs p-1">
-                <p className="font-semibold text-zinc-200">{user?.username}</p>
-                <p className="text-zinc-500 text-[10px] mt-0.5">{user?.email}</p>
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </div>
+        {/* Bottom spacer / Server actions if needed */}
+        <div className="flex flex-col gap-4 items-center w-full" />
       </div>
     </TooltipProvider>
   );

@@ -78,6 +78,38 @@ export default function DMCallRoomView({
   onToggleMaximize,
 }: DMCallRoomViewProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const controlsTimeoutRef = useRef<any>(null);
+
+  const handleMouseMove = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (isMaximized) {
+        setShowControls(false);
+      }
+    }, 3000);
+  };
+
+  const handleMouseLeave = () => {
+    if (isMaximized) {
+      setShowControls(false);
+    }
+  };
+
+  useEffect(() => {
+    setShowControls(true);
+  }, [isMaximized]);
+
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // If we are connecting, display a beautiful compact loading state
   if (isConnecting) {
@@ -216,9 +248,13 @@ export default function DMCallRoomView({
       </div>
 
       {/* Main Peer grid */}
-      <div className={`p-4 flex items-center justify-center transition-all ${
-        isMaximized ? 'flex-1 min-h-[300px] md:min-h-[450px]' : 'min-h-[140px] max-h-[220px]'
-      }`}>
+      <div 
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        className={`relative p-4 flex items-center justify-center transition-all overflow-hidden ${
+          isMaximized ? 'flex-1 min-h-[300px] md:min-h-[450px]' : 'min-h-[140px] max-h-[220px]'
+        }`}
+      >
         <div className={`grid gap-4 w-full h-full transition-all ${
           isMaximized ? 'max-w-5xl max-h-[75vh]' : 'max-w-4xl'
         } ${participants.length <= 1 ? 'grid-cols-1 max-w-[340px] md:max-w-[420px]' : 'grid-cols-2'}`}>
@@ -249,7 +285,11 @@ export default function DMCallRoomView({
                 ) : (
                   /* Avatar Card View */
                   <div className="flex flex-col items-center gap-2">
-                    <Avatar className={`border-2 border-zinc-855 shadow-md relative transition-all ${
+                    <Avatar className={`border-2 shadow-md relative transition-all duration-200 ${
+                      p.isSpeaking && !p.isAudioMuted 
+                        ? 'border-emerald-500 ring-2 ring-emerald-500/30 scale-105' 
+                        : 'border-zinc-855'
+                    } ${
                       isMaximized ? 'w-20 h-20 md:w-24 md:h-24' : 'w-12 h-12'
                     }`}>
                       <AvatarFallback className={`font-bold text-white ${getAvatarGradient(p.name || '')} ${
@@ -287,78 +327,173 @@ export default function DMCallRoomView({
             );
           })}
         </div>
+
+        {/* Floating Controls Overlay (Only visible when Maximized) */}
+        {isMaximized && (
+          <div 
+            onMouseEnter={() => {
+              if (controlsTimeoutRef.current) {
+                clearTimeout(controlsTimeoutRef.current);
+              }
+            }}
+            onMouseLeave={handleMouseMove}
+            className={`absolute bottom-6 left-1/2 -translate-x-1/2 bg-zinc-950/85 backdrop-blur-xl border border-zinc-800/80 px-6 py-3 rounded-2xl flex items-center gap-4.5 shadow-2xl z-20 transition-all duration-300 ${
+              showControls ? 'opacity-100 translate-y-0 visible' : 'opacity-0 translate-y-4 invisible pointer-events-none'
+            }`}
+          >
+            {/* Toggle Mic */}
+            <button
+              onClick={onToggleMic}
+              className={`p-3 rounded-xl border transition-all duration-150 outline-none cursor-pointer active:scale-95 ${
+                voiceMuted
+                  ? 'bg-rose-650 border-rose-600 text-white shadow-lg shadow-rose-650/10'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800'
+              }`}
+              title={voiceMuted ? 'Mở Mic' : 'Tắt Mic'}
+            >
+              {voiceMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </button>
+
+            {/* Toggle Camera */}
+            <button
+              onClick={onToggleCamera}
+              className={`p-3 rounded-xl border transition-all duration-150 outline-none cursor-pointer active:scale-95 ${
+                participants.find(p => p.isLocal)?.isVideoEnabled
+                  ? 'bg-emerald-650 border-emerald-600 text-white shadow-lg shadow-emerald-650/10'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800'
+              }`}
+              title="Bật/Tắt Video"
+            >
+              {participants.find(p => p.isLocal)?.isVideoEnabled ? (
+                <VideoIcon className="w-5 h-5" />
+              ) : (
+                <VideoOff className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Toggle Screen Share */}
+            <button
+              onClick={onToggleScreenShare}
+              className={`p-3 rounded-xl border transition-all duration-150 outline-none cursor-pointer active:scale-95 ${
+                participants.find(p => p.isLocal)?.isScreenSharing
+                  ? 'bg-emerald-650 border-emerald-600 text-white shadow-lg shadow-emerald-650/10'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800'
+              }`}
+              title="Chia sẻ màn hình"
+            >
+              {participants.find(p => p.isLocal)?.isScreenSharing ? (
+                <Monitor className="w-5 h-5" />
+              ) : (
+                <MonitorOff className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Toggle Deafen */}
+            <button
+              onClick={onToggleDeafen}
+              className={`p-3 rounded-xl border transition-all duration-150 outline-none cursor-pointer active:scale-95 ${
+                voiceDeafened
+                  ? 'bg-rose-650 border-rose-600 text-white shadow-lg shadow-rose-650/10'
+                  : 'bg-zinc-900 border-zinc-850 text-zinc-300 hover:text-white hover:bg-zinc-800'
+              }`}
+              title={voiceDeafened ? 'Mở âm thanh' : 'Tắt âm thanh (Deafen)'}
+            >
+              {voiceDeafened ? (
+                <span className="relative flex items-center justify-center">
+                  <Volume2 className="w-5 h-5 opacity-40" />
+                  <span className="absolute w-[20px] h-[2.5px] bg-white rotate-45" />
+                </span>
+              ) : (
+                <Volume2 className="w-5 h-5" />
+              )}
+            </button>
+
+            <div className="w-[1px] h-6 bg-zinc-800 mx-1 shrink-0" />
+
+            {/* Disconnect */}
+            <button
+              onClick={onDisconnect}
+              className="p-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl transition-all duration-150 cursor-pointer outline-none border-0 shadow-lg shadow-rose-650/20 active:scale-95 flex items-center justify-center"
+              title="Gác máy"
+            >
+              <PhoneOff className="w-5 h-5" />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Control Actions bar */}
-      <div className="h-[52px] border-t border-zinc-900/60 bg-zinc-950/30 backdrop-blur-sm flex items-center justify-center gap-3">
-        {/* Toggle Mic */}
-        <button
-          onClick={onToggleMic}
-          className={`p-2 rounded-xl border transition outline-none cursor-pointer ${
-            voiceMuted
-              ? 'bg-rose-950/40 border-rose-900/50 text-rose-400 hover:bg-rose-950/60'
-              : 'bg-zinc-900 border-zinc-850 text-zinc-300 hover:text-white hover:bg-zinc-800'
-          }`}
-          title={voiceMuted ? 'Mở Mic' : 'Tắt Mic'}
-        >
-          {voiceMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-        </button>
+      {/* Flat Control Actions bar (Only visible when not Maximized) */}
+      {!isMaximized && (
+        <div className="h-[52px] border-t border-zinc-900/60 bg-zinc-950/30 backdrop-blur-sm flex items-center justify-center gap-3">
+          {/* Toggle Mic */}
+          <button
+            onClick={onToggleMic}
+            className={`p-2 rounded-xl border transition outline-none cursor-pointer ${
+              voiceMuted
+                ? 'bg-rose-950/40 border-rose-900/50 text-rose-400 hover:bg-rose-950/60'
+                : 'bg-zinc-900 border-zinc-850 text-zinc-300 hover:text-white hover:bg-zinc-800'
+            }`}
+            title={voiceMuted ? 'Mở Mic' : 'Tắt Mic'}
+          >
+            {voiceMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
 
-        {/* Toggle Camera */}
-        <button
-          onClick={onToggleCamera}
-          className="p-2 rounded-xl bg-zinc-900 border border-zinc-855 text-zinc-300 hover:text-white hover:bg-zinc-800 transition outline-none cursor-pointer"
-          title="Bật/Tắt Video"
-        >
-          {participants.find(p => p.isLocal)?.isVideoEnabled ? (
-            <VideoIcon className="w-4 h-4 text-emerald-400" />
-          ) : (
-            <VideoOff className="w-4 h-4" />
-          )}
-        </button>
+          {/* Toggle Camera */}
+          <button
+            onClick={onToggleCamera}
+            className="p-2 rounded-xl bg-zinc-900 border border-zinc-855 text-zinc-300 hover:text-white hover:bg-zinc-800 transition outline-none cursor-pointer"
+            title="Bật/Tắt Video"
+          >
+            {participants.find(p => p.isLocal)?.isVideoEnabled ? (
+              <VideoIcon className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <VideoOff className="w-4 h-4" />
+            )}
+          </button>
 
-        {/* Toggle Screen Share */}
-        <button
-          onClick={onToggleScreenShare}
-          className="p-2 rounded-xl bg-zinc-900 border border-zinc-855 text-zinc-300 hover:text-white hover:bg-zinc-800 transition outline-none cursor-pointer"
-          title="Chia sẻ màn hình"
-        >
-          {participants.find(p => p.isLocal)?.isScreenSharing ? (
-            <Monitor className="w-4 h-4 text-emerald-400 animate-pulse" />
-          ) : (
-            <MonitorOff className="w-4 h-4" />
-          )}
-        </button>
+          {/* Toggle Screen Share */}
+          <button
+            onClick={onToggleScreenShare}
+            className="p-2 rounded-xl bg-zinc-900 border border-zinc-855 text-zinc-300 hover:text-white hover:bg-zinc-800 transition outline-none cursor-pointer"
+            title="Chia sẻ màn hình"
+          >
+            {participants.find(p => p.isLocal)?.isScreenSharing ? (
+              <Monitor className="w-4 h-4 text-emerald-400 animate-pulse" />
+            ) : (
+              <MonitorOff className="w-4 h-4" />
+            )}
+          </button>
 
-        {/* Toggle Deafen */}
-        <button
-          onClick={onToggleDeafen}
-          className={`p-2 rounded-xl border transition outline-none cursor-pointer ${
-            voiceDeafened
-              ? 'bg-rose-950/40 border-rose-900/50 text-rose-400 hover:bg-rose-950/60'
-              : 'bg-zinc-900 border-zinc-855 text-zinc-300 hover:text-white hover:bg-zinc-800'
-          }`}
-          title={voiceDeafened ? 'Mở âm thanh' : 'Tắt âm thanh (Deafen)'}
-        >
-          {voiceDeafened ? (
-            <span className="relative flex items-center justify-center">
-              <Volume2 className="w-4 h-4 opacity-40" />
-              <span className="absolute w-[18px] h-[1.5px] bg-rose-500 rotate-45" />
-            </span>
-          ) : (
-            <Volume2 className="w-4 h-4" />
-          )}
-        </button>
+          {/* Toggle Deafen */}
+          <button
+            onClick={onToggleDeafen}
+            className={`p-2 rounded-xl border transition outline-none cursor-pointer ${
+              voiceDeafened
+                ? 'bg-rose-950/40 border-rose-900/50 text-rose-455 hover:bg-rose-950/60'
+                : 'bg-zinc-900 border-zinc-855 text-zinc-300 hover:text-white hover:bg-zinc-800'
+            }`}
+            title={voiceDeafened ? 'Mở âm thanh' : 'Tắt âm thanh (Deafen)'}
+          >
+            {voiceDeafened ? (
+              <span className="relative flex items-center justify-center">
+                <Volume2 className="w-4 h-4 opacity-40" />
+                <span className="absolute w-[18px] h-[1.5px] bg-rose-500 rotate-45" />
+              </span>
+            ) : (
+              <Volume2 className="w-4 h-4" />
+            )}
+          </button>
 
-        {/* Disconnect */}
-        <button
-          onClick={onDisconnect}
-          className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer outline-none border-0 shadow-md active:scale-95"
-          title="Gác máy"
-        >
-          <PhoneOff className="w-4 h-4" />
-        </button>
-      </div>
+          {/* Disconnect */}
+          <button
+            onClick={onDisconnect}
+            className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer outline-none border-0 shadow-md active:scale-95"
+            title="Gác máy"
+          >
+            <PhoneOff className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

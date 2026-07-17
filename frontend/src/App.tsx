@@ -104,13 +104,10 @@ export default function App() {
     <VoiceCallProvider>
       <div className="flex h-screen bg-zinc-950 text-zinc-200 select-none overflow-hidden">
         {/* 1. Slim Left Navigation Sidebar */}
-        <WorkspaceSidebar
-          user={user}
-          onLogout={handleLogout}
-        />
+        <WorkspaceSidebar />
 
         {/* 2. Fluid Content Explorer Sidebar */}
-        <ContentExplorer />
+        <ContentExplorer onLogout={handleLogout} />
 
         {/* 3. Main Chat Viewport */}
         <ChatViewport onSendMessage={sendMessage} onSendTyping={sendTyping} />

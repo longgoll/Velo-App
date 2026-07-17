@@ -3,6 +3,7 @@ import { useLiveKit } from '@/hooks/useLiveKit';
 import type { VoiceParticipant } from '@/hooks/useLiveKit';
 import { useChatStore } from '@/store/useChatStore';
 import api from '@/lib/api';
+import { Room } from 'livekit-client';
 
 interface VoiceCallContextType {
   isConnected: boolean;
@@ -13,6 +14,7 @@ interface VoiceCallContextType {
   toggleCamera: (enabled?: boolean) => Promise<void>;
   toggleScreenShare: () => Promise<void>;
   disconnectCall: () => void;
+  room: Room | null;
 }
 
 const VoiceCallContext = createContext<VoiceCallContextType | undefined>(undefined);
@@ -99,6 +101,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
         toggleCamera,
         toggleScreenShare,
         disconnectCall,
+        room,
       }}
     >
       {children}
