@@ -14,6 +14,8 @@ pub struct ChatMessage {
     pub username: String,
     pub content: String,
     pub timestamp: i64,
+    #[serde(default)]
+    pub reactions: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

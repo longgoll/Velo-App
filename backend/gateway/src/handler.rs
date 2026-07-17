@@ -194,11 +194,11 @@ async fn handle_socket(
                                     user_id: user_id_clone.clone(),
                                     username: username_clone.clone(),
                                     content,
-                                    // Lấy Unix timestamp hiện tại tính theo ms
                                     timestamp: std::time::SystemTime::now()
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .unwrap()
                                         .as_millis() as i64,
+                                    reactions: None,
                                 };
 
                                 // Publish tin nhắn lên Valkey Pub/Sub

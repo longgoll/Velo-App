@@ -19,6 +19,12 @@ export interface Channel {
   is_private?: boolean;
 }
 
+export interface ReactionSummary {
+  emoji: string;
+  usernames: string[];
+  me: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   channel_id: string;
@@ -26,6 +32,7 @@ export interface ChatMessage {
   username: string;
   content: string;
   timestamp: string | number;
+  reactions?: ReactionSummary[];
 }
 
 export interface DMChannel {

@@ -102,7 +102,7 @@ export const useWebSocket = (token: string | null) => {
             if (!oldMessages) return [chatMsg];
             // Tránh duplicate tin nhắn, nhưng cập nhật nội dung nếu có thay đổi (ví dụ: ảnh thumbnail)
             if (oldMessages.some(m => m.id === chatMsg.id)) {
-              return oldMessages.map(m => m.id === chatMsg.id ? { ...m, content: chatMsg.content } : m);
+              return oldMessages.map(m => m.id === chatMsg.id ? chatMsg : m);
             }
 
             // Check if there is an optimistic upload message to replace

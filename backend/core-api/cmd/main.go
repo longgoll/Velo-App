@@ -87,7 +87,7 @@ func main() {
 	userUseCase := usecase.NewUserUseCase(userRepo, tokenMaker)
 	workspaceUseCase := usecase.NewWorkspaceUseCase(workspaceRepo)
 	channelUseCase := usecase.NewChannelUseCase(channelRepo, workspaceRepo, cfg.LiveKitURL, cfg.LiveKitApiKey, cfg.LiveKitApiSecret)
-	messageUseCase := usecase.NewMessageUseCase(messageRepo, channelRepo, workspaceRepo)
+	messageUseCase := usecase.NewMessageUseCase(messageRepo, channelRepo, workspaceRepo, db, redisClient)
 	attachmentUseCase := usecase.NewAttachmentUseCase(minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)
 	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo)
 

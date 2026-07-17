@@ -145,3 +145,11 @@ func (n *Notification) BeforeCreate(tx *gorm.DB) (err error) {
 	}
 	return
 }
+
+type MessageReaction struct {
+	MessageID string    `gorm:"primaryKey;type:varchar(36)" json:"message_id"`
+	UserID    string    `gorm:"primaryKey;type:varchar(36)" json:"user_id"`
+	Username  string    `gorm:"type:varchar(100);not null" json:"username"`
+	Emoji     string    `gorm:"primaryKey;type:varchar(50)" json:"emoji"`
+	CreatedAt time.Time `json:"created_at"`
+}
