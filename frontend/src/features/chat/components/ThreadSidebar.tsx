@@ -5,6 +5,8 @@ import MessageItem from './MessageItem';
 import { useChatStore } from '@/store/useChatStore';
 import { getAvatarGradient } from '@/lib/utils';
 import { useMentionAutocomplete } from '../hooks/useMentionAutocomplete';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/lib/api';
 
 interface ThreadSidebarProps {
   parentMessage: ChatMessage & { replies?: ChatMessage[] };
@@ -30,6 +32,17 @@ export default function ThreadSidebar({
   const isInitialLoad = useRef(true);
 
   const { activeWorkspaceId } = useChatStore();
+
+  // Fetch pins to check if parent message or replies are pinned
+  const { data: pins = [] } = useQuery<any[]>({
+    queryKey: ['pins', parentMessage.channel_id],
+    queryFn: async () => {
+      if (!parentMessage.channel_id) return [];
+      const res = await api.get(`/channels/${parentMessage.channel_id}/pins`);
+      return res.data;
+    },
+    enabled: !!parentMessage.channel_id,
+  });
 
   // Use the extracted Mention Autocomplete hook
   const {
@@ -147,13 +160,20 @@ export default function ThreadSidebar({
           <div className="text-[10px] text-zinc-550 font-bold tracking-wider uppercase mb-2 select-none">
             Tin nhắn gốc
           </div>
-          <MessageItem 
-            msg={parentMessage} 
-            onReplyClick={() => {}} 
-            members={members}
-            isReplyChild={true} 
-            hideReply={true} 
-          />
+          {(() => {
+            const pin = pins.find((p: any) => p.message_id === parentMessage.id);
+            return (
+              <MessageItem 
+                msg={parentMessage} 
+                onReplyClick={() => {}} 
+                members={members}
+                isReplyChild={true} 
+                hideReply={true} 
+                isPinned={!!pin}
+                pinId={pin?.id}
+              />
+            );
+          })()}
         </div>
 
         <div className="flex items-center gap-2 my-1 select-none">
@@ -165,17 +185,22 @@ export default function ThreadSidebar({
         {/* Replies List */}
         <div className="flex flex-col gap-3">
           {parentMessage.replies && parentMessage.replies.length > 0 ? (
-            parentMessage.replies.map((reply) => (
-              <MessageItem 
-                key={reply.id} 
-                msg={reply} 
-                onReplyClick={() => {}} 
-                members={members}
-                isReplyChild={true} 
-                hideReply={true} 
-                unreadTimestamp={unreadTimestamp}
-              />
-            ))
+            parentMessage.replies.map((reply) => {
+              const rPin = pins.find((p: any) => p.message_id === reply.id);
+              return (
+                <MessageItem 
+                  key={reply.id} 
+                  msg={reply} 
+                  onReplyClick={() => {}} 
+                  members={members}
+                  isReplyChild={true} 
+                  hideReply={true} 
+                  unreadTimestamp={unreadTimestamp}
+                  isPinned={!!rPin}
+                  pinId={rPin?.id}
+                />
+              );
+            })
           ) : (
             <div className="text-center py-10 text-zinc-650 text-xs select-none">
               Chưa có câu trả lời nào. Hãy là người đầu tiên phản hồi!

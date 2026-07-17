@@ -5,7 +5,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import api from '@/lib/api';
 import { useChatStore } from '@/store/useChatStore';
 import { toast } from '@/store/useToastStore';
-import type { ChatMessage, ReactionSummary } from '@/types';
+import type { ChatMessage, ReactionSummary, WorkspaceMember } from '@/types';
 
 interface MessageQuickActionsProps {
   msg: ChatMessage;
@@ -13,6 +13,9 @@ interface MessageQuickActionsProps {
   hideReply?: boolean;
   channelId?: string;
   onPinSuccess?: () => void;
+  isPinned?: boolean;
+  pinId?: string;
+  members?: WorkspaceMember[];
 }
 
 export function MessageQuickActions({
@@ -21,6 +24,9 @@ export function MessageQuickActions({
   hideReply = false,
   channelId,
   onPinSuccess,
+  isPinned = false,
+  pinId,
+  members = [],
 }: MessageQuickActionsProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
@@ -32,10 +38,10 @@ export function MessageQuickActions({
   const { activeWorkspaceId } = useChatStore();
 
   // Check if user is admin/owner to show pin button
-  const { data: members = [] } = queryClient.getQueryData<any[]>(['workspace-members', activeWorkspaceId]) 
-    ? { data: queryClient.getQueryData<any[]>(['workspace-members', activeWorkspaceId]) || [] } 
-    : { data: [] };
-  const myRole = (members as any[]).find((m: any) => m.user_id === currentUser?.id)?.role || 'member';
+  const workspaceMembers = members.length > 0 
+    ? members 
+    : (queryClient.getQueryData<any[]>(['workspace-members', activeWorkspaceId]) || []);
+  const myRole = (workspaceMembers as any[]).find((m: any) => m.user_id === currentUser?.id)?.role || 'member';
   const canPin = myRole === 'owner' || myRole === 'admin';
 
   useEffect(() => {
@@ -155,6 +161,22 @@ export function MessageQuickActions({
     }
   };
 
+  const handleUnpin = async () => {
+    const cId = channelId || msg.channel_id;
+    if (!cId || !pinId) return;
+    setIsPinning(true);
+    try {
+      await api.delete(`/channels/${cId}/pins/${pinId}`);
+      queryClient.invalidateQueries({ queryKey: ['pins', cId] });
+      toast.success('Đã bỏ ghim tin nhắn!');
+      onPinSuccess?.();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Không thể bỏ ghim tin nhắn.');
+    } finally {
+      setIsPinning(false);
+    }
+  };
+
   return (
     <div className="relative">
       {/* Floating Quick Action Bar on Hover */}
@@ -214,12 +236,14 @@ export function MessageQuickActions({
           {/* Pin message (admin/owner only) */}
           {canPin && (
             <button
-              onClick={handlePin}
+              onClick={isPinned ? handleUnpin : handlePin}
               disabled={isPinning}
-              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 transition active:scale-90 cursor-pointer border-0 outline-none disabled:opacity-50"
-              title="Ghim tin nhắn"
+              className={`w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-800 transition active:scale-90 cursor-pointer border-0 outline-none disabled:opacity-50 ${
+                isPinned ? 'text-amber-400 hover:text-zinc-400' : 'text-zinc-400 hover:text-amber-400'
+              }`}
+              title={isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}
             >
-              <Pin className="w-4 h-4" />
+              <Pin className={`w-4 h-4 ${isPinned ? 'fill-amber-400/20' : ''}`} />
             </button>
           )}
         </div>

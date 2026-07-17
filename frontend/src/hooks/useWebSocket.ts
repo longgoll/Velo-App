@@ -108,9 +108,14 @@ export const useWebSocket = (token: string | null) => {
         if (data.type === 'message') {
           const chatMsg: ChatMessage = data.payload;
           const isReactionUpdate = chatMsg.type === 'reaction';
+          const isPinUpdate = chatMsg.type === 'pin' || chatMsg.type === 'unpin';
+
+          if (isPinUpdate) {
+            queryClient.invalidateQueries({ queryKey: ['pins', chatMsg.channel_id] });
+          }
 
           // Detect incoming call messages
-          const isCallMsg = !isReactionUpdate && !!chatMsg.content.match(/^\[call:(voice|video):active\]/);
+          const isCallMsg = !isReactionUpdate && !isPinUpdate && !!chatMsg.content.match(/^\[call:(voice|video):active\]/);
           const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
           const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
 
@@ -130,7 +135,7 @@ export const useWebSocket = (token: string | null) => {
           queryClient.setQueryData(['messages', chatMsg.channel_id], (oldData: any) => {
             if (!oldData) {
               // Khi chưa có data, tạo InfiniteQuery structure
-              if (isReactionUpdate) return undefined;
+              if (isReactionUpdate || isPinUpdate) return undefined;
               return {
                 pages: [[chatMsg]],
                 pageParams: [undefined],
@@ -151,7 +156,7 @@ export const useWebSocket = (token: string | null) => {
                 };
               }
 
-              if (isReactionUpdate) return oldData;
+              if (isReactionUpdate || isPinUpdate) return oldData;
 
               // Check optimistic upload message
               const lastPage = oldData.pages[oldData.pages.length - 1] as ChatMessage[];
@@ -183,7 +188,7 @@ export const useWebSocket = (token: string | null) => {
             if (oldMessages.some(m => m.id === chatMsg.id)) {
               return oldMessages.map(m => m.id === chatMsg.id ? chatMsg : m);
             }
-            if (isReactionUpdate) return oldMessages;
+            if (isReactionUpdate || isPinUpdate) return oldMessages;
             const uploadIndex = oldMessages.findIndex(m => 
               m.id.startsWith('upload-') && 
               (m.content === chatMsg.content || chatMsg.content.includes(m.content.replace('[uploading:', '').replace(']', '')))

@@ -91,7 +91,7 @@ func main() {
 	messageUseCase := usecase.NewMessageUseCase(messageRepo, channelRepo, workspaceRepo, db, redisClient)
 	attachmentUseCase := usecase.NewAttachmentUseCase(minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)
 	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo)
-	pinnedMessageUseCase := usecase.NewPinnedMessageUseCase(pinnedMessageRepo)
+	pinnedMessageUseCase := usecase.NewPinnedMessageUseCase(pinnedMessageRepo, redisClient)
 
 	// 5.5. Start Background Message Worker
 	msgWorker := worker.NewMessageWorker(db, redisClient, messageRepo, minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)

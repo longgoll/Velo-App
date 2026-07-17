@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { ChatMessage, WorkspaceMember } from '@/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { MessageSquare, Copy, Check, ArrowDownToLine, X } from 'lucide-react';
+import { MessageSquare, Copy, Check, ArrowDownToLine, X, Pin } from 'lucide-react';
 import { getAvatarGradient } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { parseImageContent, parseFileContent } from '../utils/mediaUtils';
@@ -35,6 +35,8 @@ interface MessageItemProps {
   isActiveThread?: boolean;
   hideReply?: boolean;
   isHighlighted?: boolean;
+  isPinned?: boolean;
+  pinId?: string;
 }
 
 // Safe timestamp conversion helper — hoisted ra ngoài component
@@ -52,6 +54,8 @@ function MessageItemInner({
   isActiveThread = false,
   hideReply = false,
   isHighlighted = false,
+  isPinned = false,
+  pinId,
 }: MessageItemProps) {
   const currentUser = useCurrentUser();
 
@@ -160,6 +164,13 @@ function MessageItemInner({
           <span className="text-indigo-400">@{msg.parentUsername}</span>
         </div>
       )}
+      {/* Pinned Message Indicator */}
+      {isPinned && (
+        <div className="flex items-center gap-1.5 text-[10px] text-amber-400/90 ml-12 mb-1 select-none font-semibold animate-in fade-in slide-in-from-top-1 duration-200">
+          <Pin className="w-3 h-3 text-amber-400 shrink-0" />
+          <span>Tin nhắn đã ghim</span>
+        </div>
+      )}
       {/* 2. Main Message Container */}
       <div className={`flex gap-4 items-start group p-2 rounded-xl transition duration-150 relative w-full ${
         isHighlighted
@@ -198,6 +209,9 @@ function MessageItemInner({
           msg={msg}
           onReplyClick={onReplyClick}
           hideReply={hideReply}
+          isPinned={isPinned}
+          pinId={pinId}
+          members={members}
         />
       </div>
 
@@ -305,6 +319,8 @@ export default React.memo(MessageItemInner, (prev, next) => {
     prev.unreadTimestamp === next.unreadTimestamp &&
     prev.members === next.members &&
     prev.hideReply === next.hideReply &&
-    prev.isReplyChild === next.isReplyChild
+    prev.isReplyChild === next.isReplyChild &&
+    prev.isPinned === next.isPinned &&
+    prev.pinId === next.pinId
   );
 });

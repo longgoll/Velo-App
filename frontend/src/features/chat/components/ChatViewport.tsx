@@ -142,6 +142,17 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     enabled: !!activeWorkspaceId,
   });
 
+  // Fetch pinned messages to show pin badge on messages
+  const { data: pins = [] } = useQuery<any[]>({
+    queryKey: ['pins', activeChannelId],
+    queryFn: async () => {
+      if (!activeChannelId) return [];
+      const res = await api.get(`/channels/${activeChannelId}/pins`);
+      return res.data;
+    },
+    enabled: !!activeChannelId,
+  });
+
   // Fetch active call participants for the current channel to show status banner
   const { data: callParticipantsData } = useQuery<any[]>({
     queryKey: ['call-participants', activeChannelId],
@@ -629,14 +640,21 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
                           <div className="flex-1 h-[1px] bg-rose-500/50 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
                         </div>
                       )}
-                      <MessageItem 
-                        msg={msg} 
-                        members={members}
-                        onReplyClick={handleReplyClick}
-                        unreadTimestamp={unreadTimestamp}
-                        isActiveThread={activeThreadId === msg.id}
-                        isHighlighted={highlightedMsgId === msg.id}
-                      />
+                      {(() => {
+                        const pin = pins.find((p: any) => p.message_id === msg.id);
+                        return (
+                          <MessageItem 
+                            msg={msg} 
+                            members={members}
+                            onReplyClick={handleReplyClick}
+                            unreadTimestamp={unreadTimestamp}
+                            isActiveThread={activeThreadId === msg.id}
+                            isHighlighted={highlightedMsgId === msg.id}
+                            isPinned={!!pin}
+                            pinId={pin?.id}
+                          />
+                        );
+                      })()}
                     </div>
                   );
                 })}

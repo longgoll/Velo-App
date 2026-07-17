@@ -53,7 +53,7 @@ function getContentPreview(content: string): string {
 }
 
 export default function PinnedMessagesPanel({ onClose, channelName }: PinnedMessagesPanelProps) {
-  const { activeChannelId, activeWorkspaceId } = useChatStore();
+  const { activeChannelId, activeWorkspaceId, setScrollToMessageId } = useChatStore();
   const queryClient = useQueryClient();
 
   const currentUserStr = localStorage.getItem('user');
@@ -151,7 +151,8 @@ export default function PinnedMessagesPanel({ onClose, channelName }: PinnedMess
               {pins.map((pin) => (
                 <div
                   key={pin.id}
-                  className="group flex flex-col gap-2.5 p-3 bg-zinc-950/30 border border-zinc-850 rounded-xl hover:bg-zinc-850/60 hover:border-zinc-750 transition"
+                  onClick={() => setScrollToMessageId(pin.message_id)}
+                  className="group flex flex-col gap-2.5 p-3 bg-zinc-950/30 border border-zinc-850 rounded-xl hover:bg-zinc-850/60 hover:border-zinc-750 transition cursor-pointer active:scale-[0.98]"
                 >
                   {/* Top: pinner info + actions */}
                   <div className="flex items-center justify-between gap-2">
@@ -168,7 +169,10 @@ export default function PinnedMessagesPanel({ onClose, channelName }: PinnedMess
                     </div>
                     {(isAdminOrOwner || pin.pinned_by === currentUser?.id) && (
                       <button
-                        onClick={() => handleUnpin(pin.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUnpin(pin.id);
+                        }}
                         disabled={unpinMutation.isPending}
                         className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-rose-500/15 text-zinc-550 hover:text-rose-400 transition border-0 outline-none cursor-pointer disabled:opacity-50"
                         title="Bỏ ghim"
