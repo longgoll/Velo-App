@@ -10,6 +10,7 @@ interface ChatInputProps {
   channelName: string;
   onSendMessage: (channelId: string, content: string) => void;
   onFileUpload?: (file: File) => void;
+  onTyping?: () => void;
 }
 
 export default function ChatInput({
@@ -17,11 +18,22 @@ export default function ChatInput({
   channelName,
   onSendMessage,
   onFileUpload,
+  onTyping,
 }: ChatInputProps) {
   const [text, setText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastTypingSentRef = useRef<number>(0);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setText(val);
+    if (onTyping && val.trim() && Date.now() - lastTypingSentRef.current > 2000) {
+      lastTypingSentRef.current = Date.now();
+      onTyping();
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +109,7 @@ export default function ChatInput({
           type="text"
           ref={inputRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleTextChange}
           placeholder={`Gửi tin nhắn đến #${channelName}`}
           className="flex-1 bg-transparent border-0 text-white focus-visible:ring-0 focus-visible:ring-offset-0 px-0 text-sm placeholder-zinc-500 h-9 outline-none"
         />

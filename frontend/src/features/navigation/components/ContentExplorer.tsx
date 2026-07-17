@@ -297,6 +297,7 @@ export default function ContentExplorer() {
     voiceDeafened,
     setVoiceMuted,
     setVoiceDeafened,
+    presenceUsers,
   } = useChatStore();
 
   const { disconnectCall } = useVoiceCall();
@@ -484,9 +485,10 @@ export default function ContentExplorer() {
   };
 
   const getStatus = (username: string) => {
-    const code = username.charCodeAt(0) % 3;
-    if (code === 0) return { status: 'online', statusColor: 'bg-emerald-500', glowColor: 'shadow-emerald-500/30' };
-    if (code === 1) return { status: 'idle', statusColor: 'bg-amber-500', glowColor: 'shadow-amber-500/30' };
+    const status = presenceUsers[username] || 'offline';
+    if (status === 'online') {
+      return { status: 'online', statusColor: 'bg-emerald-500', glowColor: 'shadow-emerald-500/30' };
+    }
     return { status: 'offline', statusColor: 'bg-zinc-500', glowColor: 'shadow-zinc-500/10' };
   };
 
@@ -522,20 +524,14 @@ export default function ContentExplorer() {
   // Auto-select first text channel of the active workspace if none is active or active is invalid
   useEffect(() => {
     if (activeWorkspaceId && channels.length > 0) {
-      // If we are in DMs filter view, or the active channel is a DM, do not reset it to a standard workspace channel
-      const isDm = activeFilter === 'dms' || 
+      const isValid = channels.some((c) => c.id === activeChannelId) || 
                    (dmChannels && dmChannels.some((d) => d.id === activeChannelId));
-      if (isDm) {
-        return;
-      }
-
-      const isValid = channels.some((c) => c.id === activeChannelId);
       if (!isValid) {
         const firstText = channels.find((c) => c.type === 'text');
         if (firstText) {
-          setActiveChannelId(firstText.id);
+          setActiveChannelId(firstText.id, 'channel', activeWorkspaceId);
         } else {
-          setActiveChannelId(channels[0].id);
+          setActiveChannelId(channels[0].id, 'channel', activeWorkspaceId);
         }
       }
     } else if (!activeWorkspaceId && activeChannelId !== null) {
@@ -555,9 +551,9 @@ export default function ContentExplorer() {
     if (chan.type === 'voice') {
       // Single-click join voice channel instantly
       setActiveVoiceChannelId(chan.id);
-      setActiveChannelId(chan.id);
+      setActiveChannelId(chan.id, 'channel', activeWorkspaceId);
     } else {
-      setActiveChannelId(chan.id);
+      setActiveChannelId(chan.id, 'channel', activeWorkspaceId);
     }
   };
 

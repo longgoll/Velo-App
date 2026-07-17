@@ -59,7 +59,9 @@ export default function DynamicIslandCall() {
   };
 
   const handleReturnToRoom = () => {
-    setActiveChannelId(activeVoiceChannelId);
+    if (!activeVoiceChannelId) return;
+    const isChan = channels.some((c) => c.id === activeVoiceChannelId);
+    setActiveChannelId(activeVoiceChannelId, isChan ? 'channel' : 'dm', activeWorkspaceId);
   };
 
   return (

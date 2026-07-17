@@ -16,11 +16,64 @@ export const useWebSocket = (token: string | null) => {
   const queryClient = useQueryClient();
   const { activeChannelId } = useChatStore();
   const activeChannelIdRef = useRef(activeChannelId);
+  const subscribedChannelsRef = useRef<Set<string>>(new Set());
 
   // Keep ref updated
   useEffect(() => {
     activeChannelIdRef.current = activeChannelId;
   }, [activeChannelId]);
+
+  const subscribeToAllChannels = useCallback(() => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    const queryCache = queryClient.getQueryCache();
+    
+    // Get channels and DMs from query cache
+    const channelQueries = queryCache.findAll({ queryKey: ['channels'] });
+    const dmQueries = queryCache.findAll({ queryKey: ['dms'] });
+
+    const channelIds: string[] = [];
+
+    for (const q of channelQueries) {
+      const channels = q.state.data as any[];
+      if (Array.isArray(channels)) {
+        for (const c of channels) {
+          if (c && c.id) {
+            channelIds.push(c.id);
+          }
+        }
+      }
+    }
+
+    for (const q of dmQueries) {
+      const dms = q.state.data as any[];
+      if (Array.isArray(dms)) {
+        for (const d of dms) {
+          if (d && d.id) {
+            channelIds.push(d.id);
+          }
+        }
+      }
+    }
+
+    // Also include activeChannelId
+    if (activeChannelIdRef.current) {
+      channelIds.push(activeChannelIdRef.current);
+    }
+
+    // Subscribe to each channel that isn't already subscribed
+    channelIds.forEach((id) => {
+      if (!subscribedChannelsRef.current.has(id)) {
+        ws.send(JSON.stringify({
+          type: 'subscribe',
+          payload: { channel_id: id }
+        }));
+        subscribedChannelsRef.current.add(id);
+        console.log('Subscribed to channel via WS:', id);
+      }
+    });
+  }, [queryClient]);
 
   const connect = useCallback(() => {
     if (!token) return;
@@ -32,14 +85,7 @@ export const useWebSocket = (token: string | null) => {
     ws.onopen = () => {
       if (socketRef.current !== ws) return;
       console.log('WebSocket connected successfully');
-      
-      // Nếu đang ở channel nào thì subscribe channel đó ngay
-      if (activeChannelIdRef.current) {
-        ws.send(JSON.stringify({
-          type: 'subscribe',
-          payload: { channel_id: activeChannelIdRef.current }
-        }));
-      }
+      subscribeToAllChannels();
     };
 
     ws.onmessage = (event) => {
@@ -119,6 +165,14 @@ export const useWebSocket = (token: string | null) => {
               });
             }
           }
+        } else if (data.type === 'typing') {
+          const { channel_id, username } = data.payload;
+          useChatStore.getState().setTypingUser(channel_id, username, Date.now());
+        } else if (data.type === 'online_list') {
+          useChatStore.getState().setOnlineUsers(data.payload);
+        } else if (data.type === 'user_status') {
+          const { username, status } = data.payload;
+          useChatStore.getState().setUserPresence(username, status);
         }
       } catch (err) {
         console.error('Failed to parse WebSocket message:', err);
@@ -128,6 +182,7 @@ export const useWebSocket = (token: string | null) => {
     ws.onclose = () => {
       if (socketRef.current !== ws) return;
       console.log('WebSocket connection closed, reconnecting in 3s...');
+      subscribedChannelsRef.current.clear();
       setTimeout(() => {
         if (socketRef.current === ws) {
           connect();
@@ -139,7 +194,7 @@ export const useWebSocket = (token: string | null) => {
       if (socketRef.current !== ws) return;
       console.error('WebSocket error:', err);
     };
-  }, [token, queryClient]);
+  }, [token, queryClient, subscribeToAllChannels]);
 
   // Connect khi token thay đổi
   useEffect(() => {
@@ -150,18 +205,31 @@ export const useWebSocket = (token: string | null) => {
         socketRef.current = null;
         ws.close();
       }
+      subscribedChannelsRef.current.clear();
     };
   }, [token, connect]);
 
-  // Subscribe vào channel mới khi channel thay đổi
+  // Listen to TanStack queryCache updates to subscribe to newly loaded channels/DMs
   useEffect(() => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN && activeChannelId) {
-      socketRef.current.send(JSON.stringify({
-        type: 'subscribe',
-        payload: { channel_id: activeChannelId }
-      }));
-    }
-  }, [activeChannelId]);
+    if (!token) return;
+
+    const queryCache = queryClient.getQueryCache();
+    const unsubscribe = queryCache.subscribe((event) => {
+      if (event.type === 'updated' && event.query.state.status === 'success') {
+        const key = event.query.queryKey;
+        if (key[0] === 'channels' || key[0] === 'dms') {
+          subscribeToAllChannels();
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [token, queryClient, subscribeToAllChannels]);
+
+  // Subscribe into new channel when activeChannelId changes
+  useEffect(() => {
+    subscribeToAllChannels();
+  }, [activeChannelId, subscribeToAllChannels]);
 
   // Hàm gửi tin nhắn
   const sendMessage = useCallback((channelId: string, content: string) => {
@@ -175,6 +243,16 @@ export const useWebSocket = (token: string | null) => {
     }
   }, []);
 
+  // Hàm báo đang gõ chữ
+  const sendTyping = useCallback((channelId: string) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'typing',
+        payload: { channel_id: channelId }
+      }));
+    }
+  }, []);
+
   // Yêu cầu quyền thông báo từ trình duyệt khi khởi chạy
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -182,5 +260,5 @@ export const useWebSocket = (token: string | null) => {
     }
   }, []);
 
-  return { sendMessage };
+  return { sendMessage, sendTyping };
 };

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn, error};
 use crate::client::GrpcClients;
-use crate::queue::{QueueManager, ChatMessage};
+use crate::queue::{QueueManager, ChatMessage, ChannelEvent};
 use uuid::Uuid;
 use futures_util::{StreamExt, SinkExt};
 
@@ -22,6 +22,8 @@ pub enum ClientMsg {
     Subscribe { channel_id: String },
     #[serde(rename = "send_message")]
     SendMessage { channel_id: String, content: String },
+    #[serde(rename = "typing")]
+    Typing { channel_id: String },
 }
 
 #[derive(Serialize, Clone)]
@@ -31,6 +33,12 @@ pub enum ServerMsg {
     Subscribed { channel_id: String },
     #[serde(rename = "message")]
     Message(ChatMessage),
+    #[serde(rename = "typing")]
+    Typing { channel_id: String, username: String },
+    #[serde(rename = "user_status")]
+    UserStatus { username: String, status: String },
+    #[serde(rename = "online_list")]
+    OnlineList(Vec<String>),
     #[serde(rename = "error")]
     Error { message: String },
 }
@@ -73,6 +81,21 @@ async fn handle_socket(
     // Channel truyền tin nhắn từ các task nền về cho WebSocket Writer
     let (tx_out, mut rx_out) = tokio::sync::mpsc::channel::<ServerMsg>(100);
 
+    // 1. Gửi danh sách user online hiện tại cho client mới kết nối
+    match state.queue_manager.get_online_users().await {
+        Ok(users) => {
+            let _ = tx_out.send(ServerMsg::OnlineList(users)).await;
+        }
+        Err(e) => {
+            error!("Failed to get online users list from Valkey: {:?}", e);
+        }
+    }
+
+    // 2. Phát trạng thái "online" của user này tới mọi người
+    if let Err(e) = state.queue_manager.publish_presence(&username, "online").await {
+        error!("Failed to publish online presence: {:?}", e);
+    }
+
     // Writer Task: Nhận ServerMsg từ rx_out và gửi về client qua WebSocket
     let mut writer_task = tokio::spawn(async move {
         while let Some(msg) = rx_out.recv().await {
@@ -93,6 +116,21 @@ async fn handle_socket(
     let mut reader_task = tokio::spawn(async move {
         // Lưu trữ các active subscription task cho client này
         let mut active_subs = std::collections::HashMap::new();
+
+        // Tự động subscribe client này vào global:presence channel
+        let mut rx_global_presence = state_clone.queue_manager.get_or_create_channel("global:presence");
+        let tx_out_presence = tx_out_clone.clone();
+        let sub_presence_task = tokio::spawn(async move {
+            while let Ok(event) = rx_global_presence.recv().await {
+                if let ChannelEvent::Presence(presence_msg) = event {
+                    let _ = tx_out_presence.send(ServerMsg::UserStatus {
+                        username: presence_msg.username,
+                        status: presence_msg.status,
+                    }).await;
+                }
+            }
+        });
+        active_subs.insert("global:presence".to_string(), sub_presence_task);
 
         while let Some(Ok(msg)) = ws_receiver.next().await {
             if let Message::Text(text) = msg {
@@ -122,8 +160,19 @@ async fn handle_socket(
 
                                 // Spawn task lắng nghe tin nhắn của channel này và chuyển tiếp sang tx_out
                                 let sub_task = tokio::spawn(async move {
-                                    while let Ok(chat_msg) = rx_broadcast.recv().await {
-                                        let _ = tx_out_local.send(ServerMsg::Message(chat_msg)).await;
+                                    while let Ok(event) = rx_broadcast.recv().await {
+                                        match event {
+                                            ChannelEvent::Message(chat_msg) => {
+                                                let _ = tx_out_local.send(ServerMsg::Message(chat_msg)).await;
+                                            }
+                                            ChannelEvent::Typing(typing_msg) => {
+                                                let _ = tx_out_local.send(ServerMsg::Typing {
+                                                    channel_id: typing_msg.channel_id,
+                                                    username: typing_msg.username,
+                                                }).await;
+                                            }
+                                            ChannelEvent::Presence(_) => {}
+                                        }
                                     }
                                 });
 
@@ -163,6 +212,17 @@ async fn handle_socket(
                             }
                         }
                     }
+                    ClientMsg::Typing { channel_id } => {
+                        // Kiểm tra quyền truy cập channel trước khi phát event typing
+                        match state_clone.grpc_clients.check_channel_access(&user_id_clone, &channel_id).await {
+                            Ok(res) if res.is_allowed => {
+                                if let Err(e) = state_clone.queue_manager.publish_typing(&channel_id, &username_clone).await {
+                                    error!("Failed to publish typing event: {:?}", e);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             }
         }
@@ -178,6 +238,15 @@ async fn handle_socket(
         _ = &mut writer_task => reader_task.abort(),
         _ = &mut reader_task => writer_task.abort(),
     }
+
+    // Phát trạng thái "offline" của user này tới mọi người khi kết nối đóng
+    let state_cleanup = state.clone();
+    let username_cleanup = username.clone();
+    tokio::spawn(async move {
+        if let Err(e) = state_cleanup.queue_manager.publish_presence(&username_cleanup, "offline").await {
+            error!("Failed to publish offline presence: {:?}", e);
+        }
+    });
 
     info!("WebSocket connection closed for user: {}", username);
 }

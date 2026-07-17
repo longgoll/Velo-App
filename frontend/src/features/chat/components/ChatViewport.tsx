@@ -14,11 +14,74 @@ import { useVoiceCall } from '@/context/VoiceCallContext';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import AllMessagesDashboard from './AllMessagesDashboard';
 
+// Helper function to compress images before upload
+const compressImage = (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/') || file.type.includes('gif')) {
+      return resolve(file);
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        const MAX_DIM = 1280;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(file);
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              return resolve(file);
+            }
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            if (compressedFile.size >= file.size) {
+              resolve(file);
+            } else {
+              resolve(compressedFile);
+            }
+          },
+          'image/jpeg',
+          0.75
+        );
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
+};
+
+const EMPTY_OBJECT: Record<string, number> = {};
+
 interface ChatViewportProps {
   onSendMessage: (channelId: string, content: string) => void;
+  onSendTyping: (channelId: string) => void;
 }
 
-export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
+export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewportProps) {
   const { 
     activeWorkspaceId, 
     activeChannelId, 
@@ -52,16 +115,37 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Retrieve current user from local storage
+  const currentUserStr = localStorage.getItem('user');
+  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+
+  // Selector for typing users
+  const typingUsersState = useChatStore((state) => state.typingUsers[activeChannelId || '']);
+  const activeTyping = typingUsersState || EMPTY_OBJECT;
+  const typingUsers = Object.keys(activeTyping).filter(
+    (username) => username !== currentUser?.username && Date.now() - activeTyping[username] < 4000
+  );
+
+  // Timer to clean up typing indicators automatically
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    const hasTyping = Object.values(activeTyping).some(
+      (ts) => Date.now() - ts < 4000
+    );
+    if (hasTyping) {
+      const timer = setInterval(() => {
+        forceUpdate({});
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [activeTyping]);
+
   // Scroll and unread optimization states
   const [showNewMessagesBadge, setShowNewMessagesBadge] = useState(false);
   const [firstUnreadMsgId, setFirstUnreadMsgId] = useState<string | null>(null);
   const isAtBottom = useRef(true);
   const prevMessagesLength = useRef(0);
   const prevChannelId = useRef<string | null>(null);
-
-  // Retrieve current user from local storage
-  const currentUserStr = localStorage.getItem('user');
-  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
 
   // Fetch workspaces (cached from queryClient)
   const { data: workspaces = [] } = useQuery<Workspace[]>({
@@ -152,8 +236,9 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     onSendMessage(activeChannelId, replyContent);
   };
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = async (rawFile: File) => {
     if (!activeChannelId) return;
+    const file = await compressImage(rawFile);
     const fileId = `upload-${Date.now()}`;
 
     // Add inline progress message
@@ -461,7 +546,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
           onBackToChat={() => {
             const firstText = channels.find((c) => c.type === 'text');
             if (firstText) {
-              setActiveChannelId(firstText.id);
+              setActiveChannelId(firstText.id, 'channel', activeWorkspaceId);
             }
           }}
           apiParticipants={callParticipants}
@@ -740,12 +825,30 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
           </button>
         )}
 
+        {/* Typing Indicator */}
+        {typingUsers.length > 0 && (
+          <div className="px-6 pb-1.5 text-xs text-zinc-400 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-150">
+            <div className="flex gap-1 items-center">
+              <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            <span>
+              <span className="font-semibold text-zinc-300">
+                {typingUsers.join(', ')}
+              </span>{' '}
+              đang nhập...
+            </span>
+          </div>
+        )}
+
         {/* Chat Input */}
         <ChatInput
           activeChannelId={activeChannelId}
           channelName={chatTitle}
           onSendMessage={handleSendMessage}
           onFileUpload={uploadFile}
+          onTyping={() => onSendTyping(activeChannelId)}
         />
       </div>
 

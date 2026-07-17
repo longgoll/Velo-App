@@ -33,7 +33,7 @@ export default function CreateChannelModal({ open, onOpenChange }: CreateChannel
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['channels', activeWorkspaceId] });
-      setActiveChannelId(data.id);
+      setActiveChannelId(data.id, 'channel', activeWorkspaceId);
       setName('');
       setType('text');
       setIsPrivate(false);

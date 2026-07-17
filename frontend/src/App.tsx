@@ -34,7 +34,7 @@ export default function App() {
   const queryClient = useQueryClient();
 
   // WebSocket connection
-  const { sendMessage } = useWebSocket(token);
+  const { sendMessage, sendTyping } = useWebSocket(token);
 
   // Fetch logged in user data
   useEffect(() => {
@@ -103,7 +103,7 @@ export default function App() {
         <ContentExplorer />
 
         {/* 3. Main Chat Viewport */}
-        <ChatViewport onSendMessage={sendMessage} />
+        <ChatViewport onSendMessage={sendMessage} onSendTyping={sendTyping} />
 
         {/* --- Dialog / Modals --- */}
         <CreateWorkspaceModal open={showCreateWs} onOpenChange={setShowCreateWs} />

@@ -107,10 +107,10 @@ export default function CommandPalette() {
 
   const handleSelectItem = (item: any) => {
     if (item.type === 'text-chan') {
-      setActiveChannelId(item.channel.id);
+      setActiveChannelId(item.channel.id, 'channel', activeWorkspaceId);
     } else if (item.type === 'voice-chan') {
       setActiveVoiceChannelId(item.channel.id);
-      setActiveChannelId(item.channel.id);
+      setActiveChannelId(item.channel.id, 'channel', activeWorkspaceId);
     } else if (item.type === 'command') {
       toast.info(`Đã thực thi lệnh trạng thái: ${item.title}`);
     }
