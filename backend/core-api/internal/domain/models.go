@@ -69,6 +69,7 @@ type Channel struct {
 	WorkspaceID string         `gorm:"type:varchar(36);not null;index" json:"workspace_id"`
 	Name        string         `gorm:"type:varchar(100);not null" json:"name"`
 	Type        ChannelType    `gorm:"type:varchar(20);default:'text'" json:"type"`
+	IsPrivate   bool           `gorm:"type:boolean;default:false;not null" json:"is_private"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
@@ -79,6 +80,13 @@ func (c *Channel) BeforeCreate(tx *gorm.DB) (err error) {
 		c.ID = uuid.New().String()
 	}
 	return
+}
+
+type ChannelMember struct {
+	ChannelID string    `gorm:"primaryKey;type:varchar(36);index" json:"channel_id"`
+	UserID    string    `gorm:"primaryKey;type:varchar(36);index" json:"user_id"`
+	JoinedAt  time.Time `json:"joined_at"`
+	User      User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
 type WorkspaceMember struct {

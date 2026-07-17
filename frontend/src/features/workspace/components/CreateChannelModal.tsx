@@ -22,11 +22,12 @@ interface CreateChannelModalProps {
 export default function CreateChannelModal({ open, onOpenChange }: CreateChannelModalProps) {
   const [name, setName] = useState('');
   const [type, setType] = useState<'text' | 'voice'>('text');
+  const [isPrivate, setIsPrivate] = useState(false);
   const queryClient = useQueryClient();
   const { activeWorkspaceId, setActiveChannelId } = useChatStore();
 
   const createChanMutation = useMutation({
-    mutationFn: async (chanData: { name: string; type: 'text' | 'voice' }) => {
+    mutationFn: async (chanData: { name: string; type: 'text' | 'voice'; is_private: boolean }) => {
       const res = await api.post(`/workspaces/${activeWorkspaceId}/channels`, chanData);
       return res.data;
     },
@@ -35,6 +36,7 @@ export default function CreateChannelModal({ open, onOpenChange }: CreateChannel
       setActiveChannelId(data.id);
       setName('');
       setType('text');
+      setIsPrivate(false);
       onOpenChange(false);
     },
   });
@@ -42,7 +44,7 @@ export default function CreateChannelModal({ open, onOpenChange }: CreateChannel
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !activeWorkspaceId) return;
-    createChanMutation.mutate({ name: name.trim().toLowerCase(), type });
+    createChanMutation.mutate({ name: name.trim().toLowerCase(), type, is_private: isPrivate });
   };
 
   return (
@@ -93,6 +95,26 @@ export default function CreateChannelModal({ open, onOpenChange }: CreateChannel
                 Kênh Thoại (Voice)
               </label>
             </div>
+          </div>
+
+          {/* Private Channel Option */}
+          <div className="flex items-center justify-between p-3.5 bg-zinc-950/60 border border-zinc-850/80 rounded-xl">
+            <div className="space-y-0.5 pr-2">
+              <Label htmlFor="chan-private" className="text-zinc-200 text-xs font-bold cursor-pointer flex items-center gap-1.5">
+                Kênh Riêng Tư (Private)
+              </Label>
+              <p className="text-[10px] text-zinc-500 leading-normal">
+                Chỉ những thành viên được mời mới có thể xem và tham gia kênh này.
+              </p>
+            </div>
+            <input
+              id="chan-private"
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)}
+              className="accent-indigo-600 h-4 w-4 cursor-pointer rounded bg-zinc-950 border-zinc-800"
+              disabled={createChanMutation.isPending}
+            />
           </div>
 
           <DialogFooter className="flex justify-end gap-3 pt-2">

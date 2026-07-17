@@ -20,6 +20,9 @@ func NewChannelHandler(router fiber.Router, authMiddleware fiber.Handler, channe
 	channelGroup.Get("/:channel_id/participants", handler.GetCallParticipants)
 	channelGroup.Put("/:channel_id", handler.Update)
 	channelGroup.Delete("/:channel_id", handler.Delete)
+	channelGroup.Get("/:channel_id/members", handler.ListMembers)
+	channelGroup.Post("/:channel_id/members", handler.AddMember)
+	channelGroup.Delete("/:channel_id/members/:user_id", handler.RemoveMember)
 }
 
 func (h *ChannelHandler) Create(c *fiber.Ctx) error {
@@ -126,5 +129,64 @@ func (h *ChannelHandler) Delete(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "channel deleted successfully",
+	})
+}
+
+func (h *ChannelHandler) ListMembers(c *fiber.Ctx) error {
+	payload := c.Locals(authorizationPayloadKey).(*token.Payload)
+	workspaceID := c.Params("workspace_id")
+	channelID := c.Params("channel_id")
+
+	res, err := h.channelUseCase.ListMembers(payload.UserID, workspaceID, channelID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(res)
+}
+
+func (h *ChannelHandler) AddMember(c *fiber.Ctx) error {
+	payload := c.Locals(authorizationPayloadKey).(*token.Payload)
+	workspaceID := c.Params("workspace_id")
+	channelID := c.Params("channel_id")
+
+	var req struct {
+		UserID string `json:"user_id" validate:"required"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	err := h.channelUseCase.AddMember(payload.UserID, workspaceID, channelID, req.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "member added successfully",
+	})
+}
+
+func (h *ChannelHandler) RemoveMember(c *fiber.Ctx) error {
+	payload := c.Locals(authorizationPayloadKey).(*token.Payload)
+	workspaceID := c.Params("workspace_id")
+	channelID := c.Params("channel_id")
+	targetUserID := c.Params("user_id")
+
+	err := h.channelUseCase.RemoveMember(payload.UserID, workspaceID, channelID, targetUserID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "member removed successfully",
 	})
 }

@@ -41,6 +41,17 @@ func (u *messageUseCase) GetHistory(userID string, channelID string, limit int, 
 		if member == nil {
 			return nil, errors.New("access denied: you are not a member of this workspace")
 		}
+
+		// Check private channel membership
+		if channel.IsPrivate {
+			isChanMember, err := u.channelRepo.IsMember(channelID, userID)
+			if err != nil {
+				return nil, err
+			}
+			if !isChanMember {
+				return nil, errors.New("access denied: you are not a member of this private channel")
+			}
+		}
 	} else {
 		// 3. Try to get DM Channel
 		dmChannel, err := u.workspaceRepo.GetDMChannelByID(channelID)

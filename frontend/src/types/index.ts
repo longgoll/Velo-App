@@ -16,6 +16,7 @@ export interface Channel {
   name: string;
   type: 'text' | 'voice';
   workspace_id: string;
+  is_private?: boolean;
 }
 
 export interface ChatMessage {

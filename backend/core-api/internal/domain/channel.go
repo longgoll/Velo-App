@@ -1,8 +1,9 @@
 package domain
 
 type CreateChannelReq struct {
-	Name string      `json:"name" validate:"required"`
-	Type ChannelType `json:"type" validate:"required,oneof=text voice"`
+	Name      string      `json:"name" validate:"required"`
+	Type      ChannelType `json:"type" validate:"required,oneof=text voice"`
+	IsPrivate bool        `json:"is_private"`
 }
 
 type UpdateChannelReq struct {
@@ -15,6 +16,11 @@ type ChannelRepository interface {
 	ListForWorkspace(workspaceID string) ([]Channel, error)
 	Update(channel *Channel) error
 	Delete(id string) error
+	AddMember(channelID string, userID string) error
+	RemoveMember(channelID string, userID string) error
+	ListMembers(channelID string) ([]ChannelMember, error)
+	IsMember(channelID string, userID string) (bool, error)
+	ListPrivateChannelIDsForUser(workspaceID string, userID string) ([]string, error)
 }
 
 type CallParticipant struct {
@@ -31,4 +37,8 @@ type ChannelUseCase interface {
 	GetCallParticipants(userID string, workspaceID string, channelID string) ([]CallParticipant, error)
 	Update(userID string, workspaceID string, channelID string, req *UpdateChannelReq) (*Channel, error)
 	Delete(userID string, workspaceID string, channelID string) error
+	AddMember(userID string, workspaceID string, channelID string, targetUserID string) error
+	RemoveMember(userID string, workspaceID string, channelID string, targetUserID string) error
+	ListMembers(userID string, workspaceID string, channelID string) ([]ChannelMember, error)
+	IsMember(channelID string, userID string) (bool, error)
 }

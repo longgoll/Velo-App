@@ -74,11 +74,20 @@ func (u *channelUseCase) Create(userID string, workspaceID string, req *domain.C
 		WorkspaceID: workspaceID,
 		Name:        req.Name,
 		Type:        req.Type,
+		IsPrivate:   req.IsPrivate,
 	}
 
 	err = u.channelRepo.Create(channel)
 	if err != nil {
 		return nil, err
+	}
+
+	// Auto-add creator to private channel members
+	if channel.IsPrivate {
+		err = u.channelRepo.AddMember(channel.ID, userID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return channel, nil
@@ -94,7 +103,30 @@ func (u *channelUseCase) List(userID string, workspaceID string) ([]domain.Chann
 		return nil, errors.New("user is not a member of this workspace")
 	}
 
-	return u.channelRepo.ListForWorkspace(workspaceID)
+	allChannels, err := u.channelRepo.ListForWorkspace(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch private channel IDs where this user is a member
+	privateChannelIDs, err := u.channelRepo.ListPrivateChannelIDsForUser(workspaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	privateMap := make(map[string]bool)
+	for _, id := range privateChannelIDs {
+		privateMap[id] = true
+	}
+
+	var allowedChannels []domain.Channel
+	for _, ch := range allChannels {
+		if !ch.IsPrivate || privateMap[ch.ID] {
+			allowedChannels = append(allowedChannels, ch)
+		}
+	}
+
+	return allowedChannels, nil
 }
 
 func (u *channelUseCase) GetByID(channelID string) (*domain.Channel, error) {
@@ -326,4 +358,135 @@ func (u *channelUseCase) Delete(userID string, workspaceID string, channelID str
 	}
 
 	return nil
+}
+
+func (u *channelUseCase) AddMember(userID string, workspaceID string, channelID string, targetUserID string) error {
+	// 1. Verify caller is member of workspace
+	member, err := u.workspaceRepo.GetMember(workspaceID, userID)
+	if err != nil {
+		return err
+	}
+	if member == nil {
+		return errors.New("user is not a member of this workspace")
+	}
+
+	// 2. Verify target user is member of workspace
+	targetMember, err := u.workspaceRepo.GetMember(workspaceID, targetUserID)
+	if err != nil {
+		return err
+	}
+	if targetMember == nil {
+		return errors.New("target user is not a member of this workspace")
+	}
+
+	// 3. Verify channel exists and is private
+	channel, err := u.channelRepo.GetByID(channelID)
+	if err != nil {
+		return err
+	}
+	if channel == nil || channel.WorkspaceID != workspaceID {
+		return errors.New("channel not found in this workspace")
+	}
+	if !channel.IsPrivate {
+		return errors.New("cannot manage members of a public channel")
+	}
+
+	// 4. Verify permission: caller must be member of this private channel OR workspace owner/admin
+	isCallerMember, err := u.channelRepo.IsMember(channelID, userID)
+	if err != nil {
+		return err
+	}
+	if !isCallerMember && member.Role != "owner" && member.Role != "admin" {
+		return errors.New("unauthorized: only channel members or workspace admins can add members")
+	}
+
+	// 5. Check if already member
+	isTargetMember, err := u.channelRepo.IsMember(channelID, targetUserID)
+	if err != nil {
+		return err
+	}
+	if isTargetMember {
+		return errors.New("user is already a member of this channel")
+	}
+
+	return u.channelRepo.AddMember(channelID, targetUserID)
+}
+
+func (u *channelUseCase) RemoveMember(userID string, workspaceID string, channelID string, targetUserID string) error {
+	// 1. Verify caller is member of workspace
+	member, err := u.workspaceRepo.GetMember(workspaceID, userID)
+	if err != nil {
+		return err
+	}
+	if member == nil {
+		return errors.New("user is not a member of this workspace")
+	}
+
+	// 2. Verify channel exists and is private
+	channel, err := u.channelRepo.GetByID(channelID)
+	if err != nil {
+		return err
+	}
+	if channel == nil || channel.WorkspaceID != workspaceID {
+		return errors.New("channel not found in this workspace")
+	}
+	if !channel.IsPrivate {
+		return errors.New("cannot manage members of a public channel")
+	}
+
+	// 3. Verify permission:
+	// User can remove themselves (leave).
+	// Or, workspace owner/admin can remove anyone.
+	if userID != targetUserID && member.Role != "owner" && member.Role != "admin" {
+		return errors.New("unauthorized: you can only remove yourself or be removed by a workspace admin")
+	}
+
+	// 4. Verify target is member of channel
+	isTargetMember, err := u.channelRepo.IsMember(channelID, targetUserID)
+	if err != nil {
+		return err
+	}
+	if !isTargetMember {
+		return errors.New("user is not a member of this channel")
+	}
+
+	return u.channelRepo.RemoveMember(channelID, targetUserID)
+}
+
+func (u *channelUseCase) ListMembers(userID string, workspaceID string, channelID string) ([]domain.ChannelMember, error) {
+	// 1. Verify caller is member of workspace
+	member, err := u.workspaceRepo.GetMember(workspaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if member == nil {
+		return nil, errors.New("user is not a member of this workspace")
+	}
+
+	// 2. Verify channel exists and is private
+	channel, err := u.channelRepo.GetByID(channelID)
+	if err != nil {
+		return nil, err
+	}
+	if channel == nil || channel.WorkspaceID != workspaceID {
+		return nil, errors.New("channel not found in this workspace")
+	}
+	if !channel.IsPrivate {
+		return nil, errors.New("cannot list members of a public channel")
+	}
+
+	// 3. Verify permission: caller must be member of this private channel OR workspace owner/admin
+	isCallerMember, err := u.channelRepo.IsMember(channelID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isCallerMember && member.Role != "owner" && member.Role != "admin" {
+		return nil, errors.New("access denied: you are not a member of this private channel")
+	}
+
+	return u.channelRepo.ListMembers(channelID)
+}
+
+func (u *channelUseCase) IsMember(channelID string, userID string) (bool, error) {
+	return u.channelRepo.IsMember(channelID, userID)
 }

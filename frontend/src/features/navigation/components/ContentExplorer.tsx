@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
-import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe, Bell, Settings, Copy, Link, Check, Share2, PhoneCall, Mic, MicOff, Headphones, PhoneOff } from 'lucide-react';
+import { Plus, Compass, Hash, Volume2, ChevronDown, ChevronRight, Folder, FolderOpen, Search, Users, Sparkles, MessageSquare, PlusCircle, Globe, Bell, Settings, Copy, Link, Check, Share2, PhoneCall, Mic, MicOff, Headphones, PhoneOff, Lock } from 'lucide-react';
 import api from '@/lib/api';
 import { useVoiceCall } from '@/context/VoiceCallContext';
 import type { Channel, Workspace, DMChannel, WorkspaceMember } from '@/types';
@@ -65,7 +65,11 @@ function VoiceChannelItem({
         }`}
       >
         <div className="flex items-center gap-2 truncate">
-          <Volume2 className={`w-3.5 h-3.5 ${isUserInThisVoice || participants.length > 0 ? 'text-emerald-400 animate-pulse' : 'text-zinc-500'}`} />
+          {chan.is_private ? (
+            <Lock className={`w-3.5 h-3.5 ${isUserInThisVoice || participants.length > 0 ? 'text-emerald-400 animate-pulse' : 'text-zinc-500'}`} />
+          ) : (
+            <Volume2 className={`w-3.5 h-3.5 ${isUserInThisVoice || participants.length > 0 ? 'text-emerald-400 animate-pulse' : 'text-zinc-500'}`} />
+          )}
           <span className={`truncate ${isUserInThisVoice ? 'text-emerald-400 font-semibold' : ''}`}>
             {chan.name}
           </span>
@@ -146,7 +150,11 @@ function TextChannelItem({
         }`}
       >
         <div className="flex items-center gap-2 truncate">
-          <Hash className="w-3.5 h-3.5 text-zinc-500" />
+          {chan.is_private ? (
+            <Lock className="w-3.5 h-3.5 text-zinc-500" />
+          ) : (
+            <Hash className="w-3.5 h-3.5 text-zinc-500" />
+          )}
           <span className={`truncate ${unreadChannels[chan.id] > 0 ? 'font-bold text-white' : ''}`}>
             {chan.name}
           </span>

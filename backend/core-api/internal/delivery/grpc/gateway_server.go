@@ -31,6 +31,14 @@ func (s *GatewayServer) CheckChannelAccess(ctx context.Context, req *gateway.Che
 			return &gateway.CheckChannelAccessResponse{IsAllowed: false}, nil
 		}
 
+		// If the channel is private, check if the user is a member of this channel
+		if channel.IsPrivate {
+			isChanMember, err := s.channelUseCase.IsMember(req.ChannelId, req.UserId)
+			if err != nil || !isChanMember {
+				return &gateway.CheckChannelAccessResponse{IsAllowed: false}, nil
+			}
+		}
+
 		return &gateway.CheckChannelAccessResponse{
 			IsAllowed:   true,
 			WorkspaceId: channel.WorkspaceID,
