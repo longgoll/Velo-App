@@ -20,10 +20,10 @@
   - [x] Cấu hình Zustand & TanStack Query
   - [x] Thiết kế UI Sidebar 2-Stage & Message List (Shadcn/ui & Radix UI)
   - [x] Kết nối WebSocket qua Custom Hook & Đồng bộ cache của TanStack Query
-- [ ] **Phase 5: Hệ thống Upload File Siêu Tốc**
-  - [ ] Viết API sinh Presigned URL trên Go Core API
+- [x] **Phase 5: Hệ thống Upload File Siêu Tốc**
+  - [x] Viết API sinh Presigned URL trên Go Core API
   - [x] Xây dựng Frontend Drag-and-Drop và gửi file qua PUT method
-  - [ ] Viết background worker xử lý ảnh (nén, thumbnail)
+  - [x] Viết background worker xử lý ảnh (nén, thumbnail)
 - [ ] **Phase 6: Tính năng Gọi điện Voice/Video Call WebRTC**
   - [ ] Tích hợp LiveKit Server & Coturn vào Docker Compose
   - [ ] Xử lý API sinh token cuộc gọi phía Go Backend

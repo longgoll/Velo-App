@@ -24,6 +24,26 @@ interface MessageItemProps {
   hideReply?: boolean;
 }
 
+const parseImageContent = (content: string) => {
+  if (!content.startsWith('[image:') || !content.endsWith(']')) {
+    return null;
+  }
+  const inner = content.slice(7, -1);
+  const firstColonIdx = inner.indexOf(':');
+  if (firstColonIdx === -1) return null;
+  const fileName = inner.slice(0, firstColonIdx);
+  const urlsPart = inner.slice(firstColonIdx + 1);
+
+  const httpMatch = urlsPart.match(/:(https?:\/\/)/);
+  if (httpMatch && httpMatch.index !== undefined) {
+    const originalUrl = urlsPart.slice(0, httpMatch.index);
+    const thumbnailUrl = urlsPart.slice(httpMatch.index + 1);
+    return { fileName, originalUrl, thumbnailUrl };
+  }
+
+  return { fileName, originalUrl: urlsPart, thumbnailUrl: undefined };
+};
+
 export default function MessageItem({
   msg,
   onReplyClick,
@@ -72,7 +92,7 @@ export default function MessageItem({
   });
 
   // Parse custom media types
-  const imageMatch = msg.content.match(/^\[image:([^:]+):([^\]]+)\]/);
+  const parsedImage = parseImageContent(msg.content);
   const fileMatch = msg.content.match(/^\[file:([^:]+):([^\]]+)\]/);
   const uploadingMatch = msg.content.match(/^\[uploading:([^\]]+)\]/);
   const callVoiceMatch = msg.content.match(/^\[call:voice:active\]/);
@@ -137,14 +157,15 @@ export default function MessageItem({
       );
     }
 
-    if (imageMatch) {
-      const [_, fileName, url] = imageMatch;
+    if (parsedImage) {
+      const { fileName, originalUrl, thumbnailUrl } = parsedImage;
+      const displayUrl = thumbnailUrl || originalUrl;
       return (
         <div className="mt-2 group/img relative max-w-sm rounded-xl overflow-hidden border border-zinc-800 shadow-md">
-          <img src={url} alt={fileName} className="w-full object-cover max-h-[220px] transition-transform duration-300 hover:scale-[1.02]" />
+          <img src={displayUrl} alt={fileName} className="w-full object-cover max-h-[220px] transition-transform duration-300 hover:scale-[1.02]" />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/60 to-transparent opacity-0 group-hover/img:opacity-100 transition duration-150 flex items-end p-2 justify-between">
             <span className="text-[10px] text-zinc-300 font-mono truncate max-w-[200px]">{fileName}</span>
-            <a href={url} download target="_blank" rel="noreferrer" className="p-1.5 bg-zinc-900/80 hover:bg-indigo-600 rounded-lg text-white transition">
+            <a href={originalUrl} download target="_blank" rel="noreferrer" className="p-1.5 bg-zinc-900/80 hover:bg-indigo-600 rounded-lg text-white transition">
               <ArrowDownToLine className="w-3.5 h-3.5" />
             </a>
           </div>

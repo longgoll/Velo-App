@@ -23,9 +23,13 @@ type Config struct {
 	GrpcPort           string
 	ScyllaHosts        string
 	ScyllaKeyspace     string
-	LiveKitURL         string
-	LiveKitApiKey      string
-	LiveKitApiSecret   string
+	LiveKitURL          string
+	LiveKitApiKey       string
+	LiveKitApiSecret    string
+	SeaweedfsS3Endpoint string
+	SeaweedfsAccessKey  string
+	SeaweedfsSecretKey  string
+	SeaweedfsBucket     string
 }
 
 func LoadConfig() *Config {
@@ -40,24 +44,28 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		Port:               getEnv("PORT", "8080"),
-		Env:                getEnv("ENV", "development"),
-		DBHost:             getEnv("DB_HOST", "localhost"),
-		DBPort:             getEnv("DB_PORT", "5432"),
-		DBUser:             getEnv("DB_USER", "postgres"),
-		DBPassword:         getEnv("DB_PASSWORD", "postgres_password"),
-		DBName:             getEnv("DB_NAME", "chat_db"),
-		DBSslMode:          getEnv("DB_SSLMODE", "disable"),
-		ValkeyHost:         getEnv("VALKEY_HOST", "localhost"),
-		ValkeyPort:         getEnv("VALKEY_PORT", "6379"),
-		NatsURL:            getEnv("NATS_URL", "nats://localhost:4222"),
-		PasetoSymmetricKey: getEnv("PASETO_SYMMETRIC_KEY", "yellow-submarine-yellow-submarin"),
-		GrpcPort:           getEnv("GRPC_PORT", "50051"),
-		ScyllaHosts:        getEnv("SCYLLA_HOSTS", "localhost:9042"),
-		ScyllaKeyspace:     getEnv("SCYLLA_KEYSPACE", "chat_messages"),
-		LiveKitURL:         getEnv("LIVEKIT_URL", "http://localhost:7880"),
-		LiveKitApiKey:      getEnv("LIVEKIT_API_KEY", "devkey"),
-		LiveKitApiSecret:   getEnv("LIVEKIT_API_SECRET", "secret"),
+		Port:                getEnv("PORT", "8080"),
+		Env:                 getEnv("ENV", "development"),
+		DBHost:              getEnv("DB_HOST", "localhost"),
+		DBPort:              getEnv("DB_PORT", "5432"),
+		DBUser:              getEnv("DB_USER", "postgres"),
+		DBPassword:          getEnv("DB_PASSWORD", "postgres_password"),
+		DBName:              getEnv("DB_NAME", "chat_db"),
+		DBSslMode:           getEnv("DB_SSLMODE", "disable"),
+		ValkeyHost:          getEnv("VALKEY_HOST", "localhost"),
+		ValkeyPort:          getEnv("VALKEY_PORT", "6379"),
+		NatsURL:             getEnv("NATS_URL", "nats://localhost:4222"),
+		PasetoSymmetricKey:  getEnv("PASETO_SYMMETRIC_KEY", "yellow-submarine-yellow-submarin"),
+		GrpcPort:            getEnv("GRPC_PORT", "50051"),
+		ScyllaHosts:         getEnv("SCYLLA_HOSTS", "localhost:9042"),
+		ScyllaKeyspace:      getEnv("SCYLLA_KEYSPACE", "chat_messages"),
+		LiveKitURL:          getEnv("LIVEKIT_URL", "http://localhost:7880"),
+		LiveKitApiKey:       getEnv("LIVEKIT_API_KEY", "devkey"),
+		LiveKitApiSecret:    getEnv("LIVEKIT_API_SECRET", "secret"),
+		SeaweedfsS3Endpoint: getEnv("SEAWEEDFS_S3_ENDPOINT", "http://localhost:8333"),
+		SeaweedfsAccessKey:  getEnv("SEAWEEDFS_ACCESS_KEY", "any_access_key"),
+		SeaweedfsSecretKey:  getEnv("SEAWEEDFS_SECRET_KEY", "any_secret_key"),
+		SeaweedfsBucket:     getEnv("SEAWEEDFS_BUCKET", "chat-media"),
 	}
 }
 

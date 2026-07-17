@@ -54,8 +54,10 @@ export const useWebSocket = (token: string | null) => {
           // Cập nhật ngầm dữ liệu cache của TanStack Query cho channel tương ứng
           queryClient.setQueryData(['messages', chatMsg.channel_id], (oldMessages: ChatMessage[] | undefined) => {
             if (!oldMessages) return [chatMsg];
-            // Tránh duplicate tin nhắn nếu đã có
-            if (oldMessages.some(m => m.id === chatMsg.id)) return oldMessages;
+            // Tránh duplicate tin nhắn, nhưng cập nhật nội dung nếu có thay đổi (ví dụ: ảnh thumbnail)
+            if (oldMessages.some(m => m.id === chatMsg.id)) {
+              return oldMessages.map(m => m.id === chatMsg.id ? { ...m, content: chatMsg.content } : m);
+            }
 
             // Check if there is an optimistic upload message to replace
             const uploadIndex = oldMessages.findIndex(m => 

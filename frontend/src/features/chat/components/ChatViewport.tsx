@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
 import api from '@/lib/api';
+import axios from 'axios';
 import { Hash, PhoneCall, Video, MessageSquare, Upload, Sparkles, Plus, Compass, Layers, ArrowDown } from 'lucide-react';
 import type { Channel, ChatMessage, Workspace, DMChannel } from '@/types';
 import MessageItem from './MessageItem';
@@ -151,7 +152,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     onSendMessage(activeChannelId, replyContent);
   };
 
-  const uploadFile = (file: File) => {
+  const uploadFile = async (file: File) => {
     if (!activeChannelId) return;
     const fileId = `upload-${Date.now()}`;
 
@@ -172,50 +173,66 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
       return [...(old || []), progressMessage];
     });
 
-    // Simulate upload progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 10;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
+    try {
+      // 1. Request presigned URL from Go Core API
+      const presignRes = await api.post('/attachments/presign', {
+        filename: file.name,
+        content_type: file.type,
+        size: file.size,
+      });
 
-        const isImage = file.type.startsWith('image/');
-        // Mocked URLs for demonstration
-        const mockUrl = isImage 
-          ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop'
-          : '#';
-        const finalContent = isImage
-          ? `[image:${file.name}:${mockUrl}]`
-          : `[file:${file.name}:${(file.size / 1024).toFixed(1)} KB]`;
+      const { upload_url, download_url } = presignRes.data;
 
-        queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-          return (old || []).map((m: any) => {
-            if (m.id === fileId) {
-              return {
-                ...m,
-                content: finalContent,
-                isUploading: false,
-                uploadProgress: undefined,
-              };
-            }
-            return m;
-          });
+      // 2. Upload file directly to SeaweedFS S3-API
+      await axios.put(upload_url, file, {
+        headers: {
+          'Content-Type': file.type,
+        },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
+              return (old || []).map((m: any) => {
+                if (m.id === fileId) {
+                  return { ...m, uploadProgress: progress };
+                }
+                return m;
+              });
+            });
+          }
+        },
+      });
+
+      // 3. Format message based on file type
+      const isImage = file.type.startsWith('image/');
+      const finalContent = isImage
+        ? `[image:${file.name}:${download_url}]`
+        : `[file:${file.name}:${(file.size / 1024).toFixed(1)} KB]`;
+
+      // 4. Update the local progress message state to complete
+      queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
+        return (old || []).map((m: any) => {
+          if (m.id === fileId) {
+            return {
+              ...m,
+              content: finalContent,
+              isUploading: false,
+              uploadProgress: undefined,
+            };
+          }
+          return m;
         });
+      });
 
-        // Broadcast to channel/DM
-        onSendMessage(activeChannelId, finalContent);
-      } else {
-        queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-          return (old || []).map((m: any) => {
-            if (m.id === fileId) {
-              return { ...m, uploadProgress: progress };
-            }
-            return m;
-          });
-        });
-      }
-    }, 200);
+      // 5. Send message over WebSocket
+      onSendMessage(activeChannelId, finalContent);
+    } catch (err: any) {
+      console.error('File upload failed:', err);
+      // Remove progress message on failure
+      queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
+        return (old || []).filter((m: any) => m.id !== fileId);
+      });
+    }
   };
 
   // Drag and Drop handlers

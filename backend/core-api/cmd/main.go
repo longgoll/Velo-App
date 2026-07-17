@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/url"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -14,6 +15,8 @@ import (
 	"github.com/hoanglong/chat/backend/core-api/internal/repository/scylla"
 	"github.com/hoanglong/chat/backend/core-api/internal/usecase"
 	"github.com/hoanglong/chat/backend/core-api/pkg/token"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/redis/go-redis/v9"
 
 	// gRPC imports
@@ -41,6 +44,32 @@ func main() {
 	})
 	defer redisClient.Close()
 
+	// 2.7. Initialize SeaweedFS S3 Client (using MinIO SDK)
+	minioHost, minioSSL := parseMinioEndpoint(cfg.SeaweedfsS3Endpoint)
+	minioClient, err := minio.New(minioHost, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.SeaweedfsAccessKey, cfg.SeaweedfsSecretKey, ""),
+		Secure: minioSSL,
+	})
+	if err != nil {
+		log.Fatalf("Failed to initialize MinIO client for SeaweedFS: %v", err)
+	}
+
+	// Auto-create SeaweedFS S3 bucket
+	ctx := context.Background()
+	exists, err := minioClient.BucketExists(ctx, cfg.SeaweedfsBucket)
+	if err != nil {
+		log.Printf("Warning: Failed to check bucket existence: %v", err)
+	} else if !exists {
+		err = minioClient.MakeBucket(ctx, cfg.SeaweedfsBucket, minio.MakeBucketOptions{})
+		if err != nil {
+			log.Printf("Warning: Failed to create bucket %s: %v", cfg.SeaweedfsBucket, err)
+		} else {
+			log.Printf("Successfully created SeaweedFS bucket: %s", cfg.SeaweedfsBucket)
+		}
+	} else {
+		log.Printf("SeaweedFS bucket %s already exists", cfg.SeaweedfsBucket)
+	}
+
 	// 3. Initialize Token Maker (PASETO)
 	tokenMaker, err := token.NewPasetoMaker(cfg.PasetoSymmetricKey)
 	if err != nil {
@@ -58,9 +87,10 @@ func main() {
 	workspaceUseCase := usecase.NewWorkspaceUseCase(workspaceRepo)
 	channelUseCase := usecase.NewChannelUseCase(channelRepo, workspaceRepo, cfg.LiveKitURL, cfg.LiveKitApiKey, cfg.LiveKitApiSecret)
 	messageUseCase := usecase.NewMessageUseCase(messageRepo, channelRepo, workspaceRepo)
+	attachmentUseCase := usecase.NewAttachmentUseCase(minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)
 
 	// 5.5. Start Background Message Worker
-	msgWorker := worker.NewMessageWorker(redisClient, messageRepo)
+	msgWorker := worker.NewMessageWorker(redisClient, messageRepo, minioClient, cfg.SeaweedfsBucket, cfg.SeaweedfsS3Endpoint)
 	msgWorker.Start(context.Background())
 
 	// 6. Start gRPC Server in background
@@ -104,6 +134,7 @@ func main() {
 	httpDelivery.NewWorkspaceHandler(api, authMiddleware, workspaceUseCase)
 	httpDelivery.NewChannelHandler(api, authMiddleware, channelUseCase)
 	httpDelivery.NewMessageHandler(api, authMiddleware, messageUseCase)
+	httpDelivery.NewAttachmentHandler(api, authMiddleware, attachmentUseCase)
 
 	// Health Check
 	app.Get("/health", func(c *fiber.Ctx) error {
@@ -114,4 +145,15 @@ func main() {
 
 	log.Printf("Starting REST HTTP Server on port %s...", cfg.Port)
 	log.Fatal(app.Listen(fmt.Sprintf(":%s", cfg.Port)))
+}
+
+// Helper to parse endpoint URL to host for MinIO
+func parseMinioEndpoint(rawURL string) (string, bool) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "localhost:8333", false
+	}
+	host := u.Host
+	useSSL := u.Scheme == "https"
+	return host, useSSL
 }
