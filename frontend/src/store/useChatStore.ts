@@ -21,6 +21,7 @@ interface ChatStore {
   recentConversations: RecentConversation[];
   typingUsers: Record<string, Record<string, number>>;
   presenceUsers: Record<string, 'online' | 'offline'>;
+  lastRead: Record<string, number>;
 
   // Modal open states
   showCreateWs: boolean;
@@ -34,6 +35,7 @@ interface ChatStore {
   setExplorerOpen: (open: boolean) => void;
   incrementUnread: (channelId: string) => void;
   clearUnread: (channelId: string) => void;
+  setUnreadCount: (channelId: string, count: number) => void;
   setActiveVoiceChannelId: (id: string | null) => void;
   setVoiceMuted: (muted: boolean) => void;
   setVoiceDeafened: (deafened: boolean) => void;
@@ -41,6 +43,8 @@ interface ChatStore {
   setTypingUser: (channelId: string, username: string, timestamp: number) => void;
   setUserPresence: (username: string, status: 'online' | 'offline') => void;
   setOnlineUsers: (usernames: string[]) => void;
+  loadUserContext: (userId: string) => void;
+  logout: () => void;
 
   setShowCreateWs: (open: boolean) => void;
   setShowJoinWs: (open: boolean) => void;
@@ -52,17 +56,50 @@ export const useChatStore = create<ChatStore>((set) => ({
   activeChannelId: typeof window !== 'undefined' ? localStorage.getItem('lastChannelId') : null,
   activeFilter: 'workspaces',
   explorerOpen: true,
-  unreadChannels: {},
+  unreadChannels: (() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        if (user?.id) {
+          const stored = localStorage.getItem(`unreadChannels_${user.id}`);
+          return stored ? JSON.parse(stored) : {};
+        }
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  })(),
   activeVoiceChannelId: null,
   voiceMuted: false,
   voiceDeafened: false,
   typingUsers: {},
   presenceUsers: {},
+  lastRead: (() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        if (user?.id) {
+          const stored = localStorage.getItem(`lastRead_${user.id}`);
+          return stored ? JSON.parse(stored) : {};
+        }
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  })(),
   recentConversations: (() => {
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem('recentConversations');
-        return stored ? JSON.parse(stored) : [];
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        if (user?.id) {
+          const stored = localStorage.getItem(`recentConversations_${user.id}`);
+          return stored ? JSON.parse(stored) : [];
+        }
       } catch (e) {
         return [];
       }
@@ -92,8 +129,16 @@ export const useChatStore = create<ChatStore>((set) => ({
     }
     set((state) => {
       const updatedUnread = { ...state.unreadChannels };
+      const updatedLastRead = { ...state.lastRead };
       if (id) {
         updatedUnread[id] = 0;
+        updatedLastRead[id] = Date.now();
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        if (user?.id) {
+          localStorage.setItem(`unreadChannels_${user.id}`, JSON.stringify(updatedUnread));
+          localStorage.setItem(`lastRead_${user.id}`, JSON.stringify(updatedLastRead));
+        }
       }
       
       let updatedRecent = state.recentConversations;
@@ -103,15 +148,18 @@ export const useChatStore = create<ChatStore>((set) => ({
           { id, type, workspaceId, timestamp: Date.now() },
           ...filtered,
         ].slice(0, 50);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('recentConversations', JSON.stringify(updatedRecent));
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        if (user?.id) {
+          localStorage.setItem(`recentConversations_${user.id}`, JSON.stringify(updatedRecent));
         }
       }
       
       return { 
         activeChannelId: id, 
         unreadChannels: updatedUnread,
-        recentConversations: updatedRecent
+        recentConversations: updatedRecent,
+        lastRead: updatedLastRead
       };
     });
   },
@@ -123,12 +171,33 @@ export const useChatStore = create<ChatStore>((set) => ({
       if (state.activeChannelId === channelId) return {};
       const updatedUnread = { ...state.unreadChannels };
       updatedUnread[channelId] = (updatedUnread[channelId] || 0) + 1;
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (user?.id) {
+        localStorage.setItem(`unreadChannels_${user.id}`, JSON.stringify(updatedUnread));
+      }
       return { unreadChannels: updatedUnread };
     }),
   clearUnread: (channelId) =>
     set((state) => {
       const updatedUnread = { ...state.unreadChannels };
       updatedUnread[channelId] = 0;
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (user?.id) {
+        localStorage.setItem(`unreadChannels_${user.id}`, JSON.stringify(updatedUnread));
+      }
+      return { unreadChannels: updatedUnread };
+    }),
+  setUnreadCount: (channelId, count) =>
+    set((state) => {
+      const updatedUnread = { ...state.unreadChannels };
+      updatedUnread[channelId] = count;
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (user?.id) {
+        localStorage.setItem(`unreadChannels_${user.id}`, JSON.stringify(updatedUnread));
+      }
       return { unreadChannels: updatedUnread };
     }),
   setActiveVoiceChannelId: (id) => set({ activeVoiceChannelId: id }),
@@ -141,8 +210,10 @@ export const useChatStore = create<ChatStore>((set) => ({
         { id, type, workspaceId, timestamp: Date.now() },
         ...filtered,
       ].slice(0, 50);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('recentConversations', JSON.stringify(updated));
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (user?.id) {
+        localStorage.setItem(`recentConversations_${user.id}`, JSON.stringify(updated));
       }
       return { recentConversations: updated };
     }),
@@ -169,5 +240,38 @@ export const useChatStore = create<ChatStore>((set) => ({
     });
     return { presenceUsers: presence };
   }),
+  loadUserContext: (userId) => {
+    try {
+      const storedRecent = localStorage.getItem(`recentConversations_${userId}`);
+      const recent = storedRecent ? JSON.parse(storedRecent) : [];
+      const storedUnread = localStorage.getItem(`unreadChannels_${userId}`);
+      const unread = storedUnread ? JSON.parse(storedUnread) : {};
+      const storedLastRead = localStorage.getItem(`lastRead_${userId}`);
+      const lastRead = storedLastRead ? JSON.parse(storedLastRead) : {};
+      set({
+        recentConversations: recent,
+        unreadChannels: unread,
+        lastRead: lastRead,
+      });
+    } catch (e) {
+      console.error('Failed to load user context:', e);
+    }
+  },
+  logout: () => {
+    localStorage.removeItem('lastWorkspaceId');
+    localStorage.removeItem('lastChannelId');
+    set({
+      activeWorkspaceId: null,
+      activeChannelId: null,
+      activeFilter: 'workspaces',
+      unreadChannels: {},
+      recentConversations: [],
+      activeVoiceChannelId: null,
+      voiceMuted: false,
+      voiceDeafened: false,
+      typingUsers: {},
+      presenceUsers: {},
+      lastRead: {},
+    });
+  },
 }));
-

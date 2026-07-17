@@ -46,6 +46,13 @@ export default function App() {
     }
   }, [token]);
 
+  // Load chat context when user logs in or mounts
+  useEffect(() => {
+    if (user?.id) {
+      useChatStore.getState().loadUserContext(user.id);
+    }
+  }, [user?.id]);
+
   // Handle direct invite link
   useEffect(() => {
     if (token) {
@@ -75,6 +82,7 @@ export default function App() {
     localStorage.setItem('user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    useChatStore.getState().loadUserContext(newUser.id);
   };
 
   const handleLogout = () => {
@@ -84,6 +92,7 @@ export default function App() {
     localStorage.removeItem('lastChannelId');
     setToken(null);
     setUser(null);
+    useChatStore.getState().logout();
   };
 
   if (!token) {

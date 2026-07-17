@@ -539,6 +539,53 @@ export default function ContentExplorer() {
     }
   }, [channels, activeWorkspaceId, activeChannelId, setActiveChannelId, activeFilter, dmChannels]);
 
+  // Synchronize unread counts on startup or when the channels/DMs lists are updated
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    // Collect all channel & DM IDs the user has access to
+    const channelIds = [
+      ...allExplorerChannels.map((c) => c.id),
+      ...allExplorerDms.map((d) => d.id),
+    ];
+
+    if (channelIds.length === 0) return;
+
+    const syncUnreads = async () => {
+      try {
+        const res = await api.post('/messages/latest', { channel_ids: channelIds });
+        const latestMessages = res.data as Record<string, any>;
+        const state = useChatStore.getState();
+
+        Object.entries(latestMessages).forEach(([channelId, msg]) => {
+          if (!msg) return;
+
+          const msgTime = new Date(msg.timestamp).getTime();
+          const lastReadTime = state.lastRead[channelId] || 0;
+
+          // Check if message is new and not sent by current user
+          if (msgTime > lastReadTime && msg.user_id !== currentUser.id) {
+            // Check if current count is 0, then initialize/override with 1 to indicate unread
+            const currentUnread = state.unreadChannels[channelId] || 0;
+            if (currentUnread === 0) {
+              state.setUnreadCount(channelId, 1);
+            }
+          } else {
+            // If the latest message is older/equal or sent by the user, clear unread status
+            const currentUnread = state.unreadChannels[channelId] || 0;
+            if (currentUnread > 0) {
+              state.clearUnread(channelId);
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Failed to sync latest message timestamps:', err);
+      }
+    };
+
+    syncUnreads();
+  }, [allExplorerChannels.length, allExplorerDms.length, currentUser?.id]);
+
   if (!explorerOpen) return null;
 
   const navigateToConversation = (id: string, isDm: boolean, workspaceId: string) => {

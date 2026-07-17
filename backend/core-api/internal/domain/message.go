@@ -18,4 +18,5 @@ type MessageRepository interface {
 
 type MessageUseCase interface {
 	GetHistory(userID string, channelID string, limit int, before time.Time) ([]*Message, error)
+	GetLatestMessages(userID string, channelIDs []string) (map[string]*Message, error)
 }

@@ -17,6 +17,7 @@ func NewMessageHandler(router fiber.Router, authMiddleware fiber.Handler, messag
 	handler := &MessageHandler{messageUseCase: messageUseCase}
 
 	router.Get("/channels/:channel_id/messages", authMiddleware, handler.GetHistory)
+	router.Post("/messages/latest", authMiddleware, handler.GetLatestMessages)
 }
 
 func (h *MessageHandler) GetHistory(c *fiber.Ctx) error {
@@ -51,4 +52,28 @@ func (h *MessageHandler) GetHistory(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(messages)
+}
+
+type GetLatestMessagesReq struct {
+	ChannelIDs []string `json:"channel_ids" validate:"required"`
+}
+
+func (h *MessageHandler) GetLatestMessages(c *fiber.Ctx) error {
+	payload := c.Locals(authorizationPayloadKey).(*token.Payload)
+
+	var req GetLatestMessagesReq
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	latest, err := h.messageUseCase.GetLatestMessages(payload.UserID, req.ChannelIDs)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(latest)
 }
