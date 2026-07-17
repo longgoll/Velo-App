@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { ChatMessage } from '@/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { CornerUpLeft, FileIcon, ArrowDownToLine, Loader2, MessageSquare, PhoneCall, Video } from 'lucide-react';
+import { CornerUpLeft, FileIcon, ArrowDownToLine, Loader2, MessageSquare, PhoneCall, Video, Copy, Check, FileText, FileCode, FileSpreadsheet, FileAudio, X } from 'lucide-react';
 import { getAvatarGradient } from '@/lib/utils';
 import { useChatStore } from '@/store/useChatStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -44,6 +46,69 @@ const parseImageContent = (content: string) => {
   return { fileName, originalUrl: urlsPart, thumbnailUrl: undefined };
 };
 
+const parseFileContent = (content: string) => {
+  if (!content.startsWith('[file:') || !content.endsWith(']')) {
+    return null;
+  }
+  const inner = content.slice(6, -1);
+  const firstColonIdx = inner.indexOf(':');
+  if (firstColonIdx === -1) return null;
+  const fileName = inner.slice(0, firstColonIdx);
+  const urlsPart = inner.slice(firstColonIdx + 1);
+
+  const lastColonIdx = urlsPart.lastIndexOf(':');
+  if (lastColonIdx === -1) {
+    return { fileName, url: urlsPart, size: 'Unknown' };
+  }
+  const url = urlsPart.slice(0, lastColonIdx);
+  const size = urlsPart.slice(lastColonIdx + 1);
+
+  return { fileName, url, size };
+};
+
+const getFileIcon = (fileName: string) => {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'pdf':
+    case 'txt':
+    case 'md':
+    case 'log':
+      return FileText;
+    case 'csv':
+    case 'xlsx':
+    case 'xls':
+      return FileSpreadsheet;
+    case 'mp3':
+    case 'wav':
+    case 'ogg':
+    case 'm4a':
+      return FileAudio;
+    case 'mp4':
+    case 'mov':
+    case 'avi':
+    case 'mkv':
+      return Video;
+    case 'js':
+    case 'ts':
+    case 'tsx':
+    case 'jsx':
+    case 'go':
+    case 'py':
+    case 'java':
+    case 'cpp':
+    case 'c':
+    case 'cs':
+    case 'html':
+    case 'css':
+    case 'json':
+    case 'yaml':
+    case 'yml':
+      return FileCode;
+    default:
+      return FileIcon;
+  }
+};
+
 export default function MessageItem({
   msg,
   onReplyClick,
@@ -56,6 +121,26 @@ export default function MessageItem({
   // Retrieve current user from local storage
   const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+
+  const [copied, setCopied] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const handleCopyLink = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setLightboxOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxOpen]);
 
   const isCallMessage = !!msg.content.match(/^\[call:(voice|video):active\]/);
 
@@ -93,7 +178,7 @@ export default function MessageItem({
 
   // Parse custom media types
   const parsedImage = parseImageContent(msg.content);
-  const fileMatch = msg.content.match(/^\[file:([^:]+):([^\]]+)\]/);
+  const parsedFile = parseFileContent(msg.content);
   const uploadingMatch = msg.content.match(/^\[uploading:([^\]]+)\]/);
   const callVoiceMatch = msg.content.match(/^\[call:voice:active\]/);
   const callVideoMatch = msg.content.match(/^\[call:video:active\]/);
@@ -162,33 +247,71 @@ export default function MessageItem({
       const displayUrl = thumbnailUrl || originalUrl;
       return (
         <div className="mt-2 group/img relative max-w-sm rounded-xl overflow-hidden border border-zinc-800 shadow-md">
-          <img src={displayUrl} alt={fileName} className="w-full object-cover max-h-[220px] transition-transform duration-300 hover:scale-[1.02]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/60 to-transparent opacity-0 group-hover/img:opacity-100 transition duration-150 flex items-end p-2 justify-between">
-            <span className="text-[10px] text-zinc-300 font-mono truncate max-w-[200px]">{fileName}</span>
-            <a href={originalUrl} download target="_blank" rel="noreferrer" className="p-1.5 bg-zinc-900/80 hover:bg-indigo-600 rounded-lg text-white transition">
-              <ArrowDownToLine className="w-3.5 h-3.5" />
-            </a>
+          <img 
+            src={displayUrl} 
+            alt={fileName} 
+            className="w-full object-cover max-h-[220px] transition-transform duration-300 hover:scale-[1.02] cursor-zoom-in"
+            onClick={() => setLightboxOpen(true)}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/60 to-transparent opacity-0 group-hover/img:opacity-100 transition duration-150 flex items-end p-2 justify-between pointer-events-none">
+            <span className="text-[10px] text-zinc-300 font-mono truncate max-w-[160px] pointer-events-auto">{fileName}</span>
+            <div className="flex items-center gap-1 pointer-events-auto">
+              <button
+                onClick={() => handleCopyLink(originalUrl)}
+                className="p-1.5 bg-zinc-900/80 hover:bg-zinc-800 rounded-lg text-white transition active:scale-95 cursor-pointer border-0 outline-none"
+                title="Sao chép liên kết"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-450" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+              <a 
+                href={originalUrl} 
+                download 
+                target="_blank" 
+                rel="noreferrer" 
+                className="p-1.5 bg-zinc-900/80 hover:bg-indigo-600 rounded-lg text-white transition active:scale-95 flex items-center justify-center"
+                title="Tải ảnh gốc"
+              >
+                <ArrowDownToLine className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
         </div>
       );
     }
 
-    if (fileMatch) {
-      const [_, fileName, fileSize] = fileMatch;
+    if (parsedFile) {
+      const { fileName, url, size } = parsedFile;
+      const FileIconComponent = getFileIcon(fileName);
       return (
-        <div className="mt-2 flex items-center justify-between p-3 bg-zinc-950/40 rounded-xl border border-zinc-800 max-w-sm hover:border-zinc-700/80 transition shadow-inner">
-          <div className="flex items-center gap-3 truncate">
-            <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
-              <FileIcon className="w-5 h-5" />
+        <div className="mt-2 flex items-center justify-between p-3 bg-zinc-950/40 rounded-xl border border-zinc-800 hover:border-zinc-700/80 transition max-w-sm shadow-inner group/file duration-150">
+          <div className="flex items-center gap-3 truncate min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0 transition group-hover/file:text-indigo-400 group-hover/file:border-zinc-700">
+              <FileIconComponent className="w-5 h-5" />
             </div>
             <div className="truncate text-left">
-              <div className="text-xs font-semibold text-zinc-200 truncate">{fileName}</div>
-              <div className="text-[9px] text-zinc-500 font-mono mt-0.5">{fileSize}</div>
+              <div className="text-xs font-semibold text-zinc-200 truncate group-hover/file:text-white transition duration-150">{fileName}</div>
+              <div className="text-[9px] text-zinc-500 font-mono mt-0.5">{size}</div>
             </div>
           </div>
-          <button className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition outline-none border-0 cursor-pointer">
-            <ArrowDownToLine className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0 ml-4">
+            <button
+              onClick={() => handleCopyLink(url)}
+              className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition outline-none border-0 cursor-pointer active:scale-95"
+              title="Sao chép liên kết"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-450" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+            <a
+              href={url}
+              download
+              target="_blank"
+              rel="noreferrer"
+              className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition outline-none border-0 cursor-pointer active:scale-95 flex items-center justify-center"
+              title="Tải tệp tin"
+            >
+              <ArrowDownToLine className="w-4 h-4" />
+            </a>
+          </div>
         </div>
       );
     }
@@ -316,6 +439,65 @@ export default function MessageItem({
           )}
           <span className={`text-[10px] ml-0.5 font-normal transition ${hasUnreadReplies ? 'text-rose-500/70 group-hover:text-rose-400' : 'text-zinc-650 group-hover:text-indigo-400/80'}`}>• Xem luồng</span>
         </button>
+      )}
+
+      {/* 4. Image Lightbox Modal overlay (using React Portal to render into document.body to bypass absolute container transforms) */}
+      {lightboxOpen && parsedImage && createPortal(
+        <div 
+          className="fixed inset-0 bg-zinc-950/90 backdrop-blur-md z-[9999] flex flex-col justify-between p-4 animate-in fade-in duration-200"
+          onClick={() => setLightboxOpen(false)}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between h-14 px-4 w-full shrink-0 select-none">
+            <span className="text-zinc-250 text-xs font-semibold truncate max-w-[80%] font-mono">
+              {parsedImage.fileName}
+            </span>
+            <button
+              onClick={() => setLightboxOpen(false)}
+              className="p-2 bg-zinc-900/60 hover:bg-zinc-800/80 hover:text-white text-zinc-400 rounded-full transition cursor-pointer border-0 outline-none active:scale-95 flex items-center justify-center"
+              title="Đóng (Esc)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Centered Image */}
+          <div 
+            className="flex-1 flex items-center justify-center min-h-0 w-full overflow-hidden p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={parsedImage.originalUrl} 
+              alt={parsedImage.fileName} 
+              className="max-w-[90vw] max-h-[75vh] object-contain rounded-lg shadow-2xl select-none animate-in zoom-in-95 duration-250"
+            />
+          </div>
+
+          {/* Footer actions */}
+          <div 
+            className="flex items-center justify-center gap-3 h-16 w-full select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => handleCopyLink(parsedImage.originalUrl)}
+              className="px-4 py-2 bg-zinc-900/60 hover:bg-zinc-800/80 text-zinc-350 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 border-0 outline-none cursor-pointer"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-450" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>Sao chép liên kết</span>
+            </button>
+            <a
+              href={parsedImage.originalUrl}
+              download
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-indigo-600/10 cursor-pointer text-center flex items-center"
+            >
+              <ArrowDownToLine className="w-3.5 h-3.5 mr-1" />
+              <span>Tải ảnh gốc</span>
+            </a>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -207,7 +207,7 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
       const isImage = file.type.startsWith('image/');
       const finalContent = isImage
         ? `[image:${file.name}:${download_url}]`
-        : `[file:${file.name}:${(file.size / 1024).toFixed(1)} KB]`;
+        : `[file:${file.name}:${download_url}:${(file.size / 1024).toFixed(1)} KB]`;
 
       // 4. Update the local progress message state to complete
       queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
