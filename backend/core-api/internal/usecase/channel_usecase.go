@@ -165,7 +165,7 @@ func (u *channelUseCase) GetCallParticipants(userID string, workspaceID string, 
 			return nil, errors.New("channel not found in this workspace")
 		}
 		if channel.Type != domain.ChannelTypeVoice {
-			return nil, errors.New("participants list is only available for voice channels")
+			return []domain.CallParticipant{}, nil
 		}
 	}
 
