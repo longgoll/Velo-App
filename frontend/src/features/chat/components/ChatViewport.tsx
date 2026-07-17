@@ -32,7 +32,9 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
     voiceMuted,
     voiceDeafened,
     setVoiceMuted,
-    setVoiceDeafened
+    setVoiceDeafened,
+    setActiveVoiceChannelId,
+    setActiveChannelId
   } = useChatStore();
 
   const {
@@ -435,10 +437,18 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
           voiceMuted={voiceMuted}
           voiceDeafened={voiceDeafened}
           onToggleMic={() => setVoiceMuted(!voiceMuted)}
-          onToggleCamera={toggleCamera}
-          onToggleScreenShare={toggleScreenShare}
-          onDisconnect={disconnectCall}
+          onToggleCamera={() => toggleCamera()}
+          onToggleScreenShare={() => toggleScreenShare()}
+          onDisconnect={() => disconnectCall()}
           onToggleDeafen={() => setVoiceDeafened(!voiceDeafened)}
+          onJoinCall={() => setActiveVoiceChannelId(activeChannel.id)}
+          onBackToChat={() => {
+            const firstText = channels.find((c) => c.type === 'text');
+            if (firstText) {
+              setActiveChannelId(firstText.id);
+            }
+          }}
+          apiParticipants={callParticipants}
         />
       </div>
     );
