@@ -9,6 +9,12 @@ export interface RecentConversation {
   timestamp: number;
 }
 
+export interface IncomingCallInfo {
+  channelId: string;
+  callerName: string;
+  isVideo: boolean;
+}
+
 interface ChatStore {
   activeWorkspaceId: string | null;
   activeChannelId: string | null;
@@ -49,6 +55,8 @@ interface ChatStore {
   setShowCreateWs: (open: boolean) => void;
   setShowJoinWs: (open: boolean) => void;
   setShowCreateChan: (open: boolean) => void;
+  incomingCall: IncomingCallInfo | null;
+  setIncomingCall: (call: IncomingCallInfo | null) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -72,6 +80,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     return {};
   })(),
   activeVoiceChannelId: null,
+  incomingCall: null,
   voiceMuted: false,
   voiceDeafened: false,
   typingUsers: {},
@@ -201,6 +210,7 @@ export const useChatStore = create<ChatStore>((set) => ({
       return { unreadChannels: updatedUnread };
     }),
   setActiveVoiceChannelId: (id) => set({ activeVoiceChannelId: id }),
+  setIncomingCall: (call) => set({ incomingCall: call }),
   setVoiceMuted: (muted) => set({ voiceMuted: muted }),
   setVoiceDeafened: (deafened) => set({ voiceDeafened: deafened }),
   addRecentConversation: (id, type, workspaceId) =>
@@ -267,6 +277,7 @@ export const useChatStore = create<ChatStore>((set) => ({
       unreadChannels: {},
       recentConversations: [],
       activeVoiceChannelId: null,
+      incomingCall: null,
       voiceMuted: false,
       voiceDeafened: false,
       typingUsers: {},

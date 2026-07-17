@@ -10,6 +10,7 @@ import ThreadSidebar from './ThreadSidebar';
 import ChatInput from './ChatInput';
 import DynamicIslandCall from '../../../components/ui/DynamicIslandCall';
 import VoiceRoomView from './VoiceRoomView';
+import DMCallRoomView from './DMCallRoomView';
 import { useVoiceCall } from '@/context/VoiceCallContext';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import AllMessagesDashboard from './AllMessagesDashboard';
@@ -114,6 +115,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   const queryClient = useQueryClient();
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isCallMaximized, setIsCallMaximized] = useState(false);
 
   // Retrieve current user from local storage
   const currentUserStr = localStorage.getItem('user');
@@ -444,6 +446,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
       setShowNewMessagesBadge(false);
       setFirstUnreadMsgId(null);
       setActiveThreadId(null); // Clear active thread on channel navigation
+      setIsCallMaximized(false); // Reset call maximize on channel change
       
       // Auto-focus the chat input textarea/input
       setTimeout(() => {
@@ -664,8 +667,8 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
           </div>
         )}
 
-        {/* 2. Dynamic Island Persistent Voice widget (only shown when Sidebar is hidden) */}
-        {activeVoiceChannelId && !explorerOpen && (activeVoiceChannelId !== activeChannelId || activeChannel?.type !== 'voice') && (
+        {/* 2. Dynamic Island Persistent Voice widget (only shown when Sidebar is hidden and not in the active channel's call) */}
+        {activeVoiceChannelId && !explorerOpen && activeVoiceChannelId !== activeChannelId && (
           <DynamicIslandCall />
         )}
 
@@ -736,124 +739,147 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
           </div>
         )}
 
-        {/* Virtualized Message List */}
-        <div 
-          ref={parentRef}
-          onScroll={handleScroll}
-          className="flex-1 px-6 py-4 overflow-y-auto no-scrollbar"
-        >
-          <div
-            style={{
-              height: `${rowVirtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative',
-            }}
-          >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const msg = structuredMessages[virtualRow.index];
-              const isUnreadStart = msg.id === firstUnreadMsgId;
+        {/* 4. DM Active Call Room */}
+        {activeDmChannel && activeVoiceChannelId === activeChannelId && (
+          <DMCallRoomView
+            channelName={chatTitle}
+            participants={participants}
+            isConnected={isConnected}
+            isConnecting={isConnecting}
+            voiceMuted={voiceMuted}
+            voiceDeafened={voiceDeafened}
+            onToggleMic={() => setVoiceMuted(!voiceMuted)}
+            onToggleCamera={() => toggleCamera()}
+            onToggleScreenShare={() => toggleScreenShare()}
+            onDisconnect={() => disconnectCall()}
+            onToggleDeafen={() => setVoiceDeafened(!voiceDeafened)}
+            isMaximized={isCallMaximized}
+            onToggleMaximize={() => setIsCallMaximized(!isCallMaximized)}
+          />
+        )}
 
-              return (
-                <div
-                  key={virtualRow.key}
-                  data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                  className="py-1 flex flex-col"
-                >
-                  {isUnreadStart && (
-                    <div className="flex items-center gap-2 my-2 select-none animate-in fade-in slide-in-from-top-1 duration-200 shrink-0">
-                      <div className="flex-1 h-[1px] bg-rose-500/50 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
-                      <span className="text-[10px] font-bold text-rose-500 tracking-wider uppercase bg-zinc-900 px-2 py-0.5 rounded border border-rose-500/20 shadow-sm shadow-rose-500/10 shrink-0">
-                        Tin nhắn mới chưa đọc
-                      </span>
-                      <div className="flex-1 h-[1px] bg-rose-500/50 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
-                    </div>
-                  )}
-                  <MessageItem 
-                    msg={msg} 
-                    onReplyClick={(message) => {
-                      let currentMsg = message;
-                      const visited = new Set<string>();
-                      
-                      while (currentMsg && !visited.has(currentMsg.id)) {
-                        visited.add(currentMsg.id);
-                        const match = currentMsg.content.match(/^\[reply:([^:]+):/);
-                        if (match) {
-                          const parentId = match[1];
-                          const parentMsg = messages.find(m => m.id === parentId);
-                          if (parentMsg) {
-                            currentMsg = parentMsg;
-                          } else {
-                            break;
+        {!isCallMaximized && (
+          <>
+            {/* Virtualized Message List */}
+            <div 
+              ref={parentRef}
+              onScroll={handleScroll}
+              className="flex-1 px-6 py-4 overflow-y-auto no-scrollbar"
+            >
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const msg = structuredMessages[virtualRow.index];
+                  const isUnreadStart = msg.id === firstUnreadMsgId;
+
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      className="py-1 flex flex-col"
+                    >
+                      {isUnreadStart && (
+                        <div className="flex items-center gap-2 my-2 select-none animate-in fade-in slide-in-from-top-1 duration-200 shrink-0">
+                          <div className="flex-1 h-[1px] bg-rose-500/50 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                          <span className="text-[10px] font-bold text-rose-500 tracking-wider uppercase bg-zinc-900 px-2 py-0.5 rounded border border-rose-500/20 shadow-sm shadow-rose-500/10 shrink-0">
+                            Tin nhắn mới chưa đọc
+                          </span>
+                          <div className="flex-1 h-[1px] bg-rose-500/50 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                        </div>
+                      )}
+                      <MessageItem 
+                        msg={msg} 
+                        onReplyClick={(message) => {
+                          let currentMsg = message;
+                          const visited = new Set<string>();
+                          
+                          while (currentMsg && !visited.has(currentMsg.id)) {
+                            visited.add(currentMsg.id);
+                            const match = currentMsg.content.match(/^\[reply:([^:]+):/);
+                            if (match) {
+                              const parentId = match[1];
+                              const parentMsg = messages.find(m => m.id === parentId);
+                              if (parentMsg) {
+                                currentMsg = parentMsg;
+                              } else {
+                                break;
+                              }
+                            } else {
+                              break;
+                            }
                           }
-                        } else {
-                          break;
-                        }
-                      }
-                      setActiveThreadId(currentMsg.id);
-                    }}
-                    unreadTimestamp={unreadTimestamp}
-                    isActiveThread={activeThreadId === msg.id}
-                  />
+                          setActiveThreadId(currentMsg.id);
+                        }}
+                        unreadTimestamp={unreadTimestamp}
+                        isActiveThread={activeThreadId === msg.id}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {structuredMessages.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-600 select-none">
+                  <p className="text-xs">Bắt đầu cuộc trò chuyện tại #{chatTitle}</p>
                 </div>
-              );
-            })}
-          </div>
-          
-          {structuredMessages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-zinc-600 select-none">
-              <p className="text-xs">Bắt đầu cuộc trò chuyện tại #{chatTitle}</p>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Floating New Messages Badge */}
-        {showNewMessagesBadge && (
-          <button
-            onClick={scrollToBottom}
-            className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-semibold py-2 px-4 rounded-full shadow-lg shadow-indigo-500/20 border border-indigo-400/30 backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 z-20 cursor-pointer animate-bounce outline-none"
-          >
-            <span>Tin nhắn mới ở phía dưới</span>
-            <ArrowDown className="w-3.5 h-3.5 animate-pulse" />
-          </button>
+            {/* Floating New Messages Badge */}
+            {showNewMessagesBadge && (
+              <button
+                onClick={scrollToBottom}
+                className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-semibold py-2 px-4 rounded-full shadow-lg shadow-indigo-500/20 border border-indigo-400/30 backdrop-blur-md transition-all duration-200 flex items-center gap-1.5 z-20 cursor-pointer animate-bounce outline-none"
+              >
+                <span>Tin nhắn mới ở phía dưới</span>
+                <ArrowDown className="w-3.5 h-3.5 animate-pulse" />
+              </button>
+            )}
+
+            {/* Typing Indicator */}
+            {typingUsers.length > 0 && (
+              <div className="px-6 pb-1.5 text-xs text-zinc-400 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-150">
+                <div className="flex gap-1 items-center">
+                  <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span>
+                  <span className="font-semibold text-zinc-300">
+                    {typingUsers.join(', ')}
+                  </span>{' '}
+                  đang nhập...
+                </span>
+              </div>
+            )}
+
+            {/* Chat Input */}
+            <ChatInput
+              activeChannelId={activeChannelId}
+              channelName={chatTitle}
+              onSendMessage={handleSendMessage}
+              onFileUpload={uploadFile}
+              onTyping={() => onSendTyping(activeChannelId)}
+            />
+          </>
         )}
-
-        {/* Typing Indicator */}
-        {typingUsers.length > 0 && (
-          <div className="px-6 pb-1.5 text-xs text-zinc-400 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-150">
-            <div className="flex gap-1 items-center">
-              <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-            <span>
-              <span className="font-semibold text-zinc-300">
-                {typingUsers.join(', ')}
-              </span>{' '}
-              đang nhập...
-            </span>
-          </div>
-        )}
-
-        {/* Chat Input */}
-        <ChatInput
-          activeChannelId={activeChannelId}
-          channelName={chatTitle}
-          onSendMessage={handleSendMessage}
-          onFileUpload={uploadFile}
-          onTyping={() => onSendTyping(activeChannelId)}
-        />
       </div>
 
       {/* Thread Sidebar Panel */}
-      {activeThreadMessage && (
+      {activeThreadMessage && !isCallMaximized && (
         <ThreadSidebar
           parentMessage={activeThreadMessage}
           onClose={() => setActiveThreadId(null)}

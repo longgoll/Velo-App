@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import Toaster from '@/components/ui/Toaster';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import IncomingCallDialog from '@/components/ui/IncomingCallDialog';
 import { toast } from '@/store/useToastStore';
 import { VoiceCallProvider } from '@/context/VoiceCallContext';
 
@@ -125,6 +126,7 @@ export default function App() {
         {/* Global notifications and confirmation dialogs */}
         <Toaster />
         <ConfirmDialog />
+        <IncomingCallDialog />
       </div>
     </VoiceCallProvider>
   );

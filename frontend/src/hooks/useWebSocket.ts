@@ -99,6 +99,23 @@ export const useWebSocket = (token: string | null) => {
         if (data.type === 'message') {
           const chatMsg: ChatMessage = data.payload;
           const isReactionUpdate = chatMsg.type === 'reaction';
+
+          // Detect incoming call messages
+          const isCallMsg = !isReactionUpdate && !!chatMsg.content.match(/^\[call:(voice|video):active\]/);
+          const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+          const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+
+          if (isCallMsg && chatMsg.user_id !== currentUser?.id) {
+            const isVideo = chatMsg.content.includes('video');
+            const activeVoiceId = useChatStore.getState().activeVoiceChannelId;
+            if (!activeVoiceId) {
+              useChatStore.getState().setIncomingCall({
+                channelId: chatMsg.channel_id,
+                callerName: chatMsg.username,
+                isVideo
+              });
+            }
+          }
           
           // Cập nhật ngầm dữ liệu cache của TanStack Query cho channel tương ứng
           queryClient.setQueryData(['messages', chatMsg.channel_id], (oldMessages: ChatMessage[] | undefined) => {
