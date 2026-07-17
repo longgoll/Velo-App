@@ -1420,6 +1420,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
       <UserSettingsModal
         open={showUserSettings}
         onOpenChange={setShowUserSettings}
+        onLogout={onLogout}
       />
 
       {activeWs && activeWorkspaceId && (

@@ -62,7 +62,7 @@ export default function WorkspaceInviteModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md w-[90vw] bg-zinc-950 border border-zinc-800 text-zinc-200 p-6 rounded-xl">
+      <DialogContent className="sm:max-w-md w-[90vw] bg-zinc-950 border border-zinc-800 text-zinc-200 p-6 rounded-xl">
         <DialogHeader className="text-left">
           <div className="flex items-center gap-2 text-indigo-400 mb-1">
             <Share2 className="w-5 h-5" />
