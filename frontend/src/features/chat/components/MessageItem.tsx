@@ -174,7 +174,7 @@ function MessageItemInner({
       {/* 2. Main Message Container */}
       <div className={`flex gap-4 items-start group p-2 rounded-xl transition duration-150 relative w-full ${
         isHighlighted
-          ? 'bg-amber-500/10 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse'
+          ? 'animate-message-highlight border'
           : isActiveThread
           ? 'bg-indigo-950/25 border border-indigo-500/25 shadow-[inset_0_0_8px_rgba(99,102,241,0.04)]'
           : 'hover:bg-zinc-800/10 border border-transparent'

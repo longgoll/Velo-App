@@ -63,6 +63,9 @@ interface ChatStore {
   setShowCreateChan: (open: boolean) => void;
   incomingCall: IncomingCallInfo | null;
   setIncomingCall: (call: IncomingCallInfo | null) => void;
+
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -89,6 +92,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   incomingCall: null,
   voiceMuted: false,
   voiceDeafened: false,
+  searchQuery: '',
 
   presenceUsers: {},
   scrollToMessageId: null,
@@ -253,6 +257,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   }),
   setSendJsonMessage: (fn) => set({ sendJsonMessage: fn }),
   setScrollToMessageId: (id) => set({ scrollToMessageId: id }),
+  setSearchQuery: (query) => set({ searchQuery: query }),
   loadUserContext: (userId) => {
     try {
       const storedRecent = localStorage.getItem(`recentConversations_${userId}`);

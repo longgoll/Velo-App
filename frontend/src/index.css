@@ -897,4 +897,21 @@ button:active, a:active {
 }
 .light .bg-zinc-950\/45 {
   background-color: rgba(243, 244, 246, 0.6) !important;
+}
+
+/* Jump-to-message flash keyframes and class */
+@keyframes message-flash {
+  0% {
+    background-color: rgba(245, 158, 11, 0.35); /* Bright amber */
+    border-color: rgba(245, 158, 11, 0.65);
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+  }
+  100% {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+}
+.animate-message-highlight {
+  animation: message-flash 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
 }

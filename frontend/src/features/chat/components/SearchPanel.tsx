@@ -13,6 +13,7 @@ interface SearchResult {
   channel?: Channel;
   dmChannel?: DMChannel;
   channelName: string;
+  displayContent: string;
 }
 
 interface SearchPanelProps {
@@ -25,7 +26,7 @@ function highlightText(text: string, query: string): React.ReactNode {
   const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
   return parts.map((part, i) =>
     part.toLowerCase() === query.toLowerCase() ? (
-      <mark key={i} className="bg-amber-500/30 text-amber-300 rounded px-0.5">
+      <mark key={i} className="bg-amber-500/20 dark:bg-amber-500/35 text-amber-900 dark:text-amber-200 font-semibold rounded px-0.5">
         {part}
       </mark>
     ) : (
@@ -45,6 +46,117 @@ function formatTimestamp(ts: string | number): string {
   return d.toLocaleDateString('vi-VN');
 }
 
+interface SearchPill {
+  type: 'from' | 'in' | 'has' | 'mentions';
+  value: string;
+  raw: string;
+}
+
+function parsePillsAndInput(query: string) {
+  const pills: SearchPill[] = [];
+  let remainingText = query;
+  
+  const regex = /(từ|trong|có|đề cập):("[^"]+"|[^\s]+)/g;
+  let match;
+  const matches: { fullMatch: string; key: string; val: string; index: number }[] = [];
+  
+  while ((match = regex.exec(query)) !== null) {
+    matches.push({
+      fullMatch: match[0],
+      key: match[1],
+      val: match[2],
+      index: match.index
+    });
+  }
+  
+  for (const m of matches) {
+    const isAtEnd = (m.index + m.fullMatch.length) === query.length;
+    const isFollowedBySpace = query[m.index + m.fullMatch.length] === ' ';
+    
+    if (!isAtEnd || isFollowedBySpace) {
+      let type: 'from' | 'in' | 'has' | 'mentions' = 'from';
+      if (m.key === 'trong') type = 'in';
+      else if (m.key === 'có') type = 'has';
+      else if (m.key === 'đề cập') type = 'mentions';
+      
+      let cleanVal = m.val;
+      if (cleanVal.startsWith('"') && cleanVal.endsWith('"')) {
+        cleanVal = cleanVal.slice(1, -1);
+      }
+      
+      pills.push({
+        type,
+        value: cleanVal,
+        raw: m.fullMatch
+      });
+      
+      remainingText = remainingText.replace(m.fullMatch, '');
+    }
+  }
+  
+  return { pills, remainingText: remainingText.trim() };
+}
+
+interface SearchFilters {
+  fromUser?: string;
+  inChannel?: string;
+  hasType?: string;
+  mentionsUser?: string;
+  textQuery: string;
+}
+
+function parseSearchQuery(query: string): SearchFilters {
+  const filters: SearchFilters = { textQuery: '' };
+  const regex = /(từ|trong|có|đề cập):("[^"]+"|[^\s]+)/g;
+  let match;
+  let remainingText = query;
+  
+  while ((match = regex.exec(query)) !== null) {
+    const key = match[1];
+    let val = match[2];
+    
+    if (val.startsWith('"') && val.endsWith('"')) {
+      val = val.slice(1, -1);
+    }
+    
+    if (key === 'từ') filters.fromUser = val;
+    else if (key === 'trong') filters.inChannel = val;
+    else if (key === 'có') filters.hasType = val;
+    else if (key === 'đề cập') filters.mentionsUser = val;
+    
+    remainingText = remainingText.replace(match[0], '');
+  }
+  
+  filters.textQuery = remainingText.replace(/\s+/g, ' ').trim();
+  return filters;
+}
+
+function formatMessageContentForSearch(content: string): string {
+  if (content.startsWith('[image:')) {
+    const parts = content.slice(7, -1).split('|');
+    const fileName = parts[1] || 'Hình ảnh';
+    return `📷 Ảnh: ${fileName}`;
+  }
+  if (content.startsWith('[file:')) {
+    const parts = content.slice(6, -1).split('|');
+    const fileName = parts[1] || 'Tệp đính kèm';
+    const size = parts[2] ? ` (${parts[2]})` : '';
+    return `📁 Tệp: ${fileName}${size}`;
+  }
+  if (content.startsWith('[call:')) {
+    const callType = content.includes('video') ? 'video' : 'thoại';
+    return `📞 Cuộc gọi ${callType}`;
+  }
+  if (content.startsWith('[reply:')) {
+    const match = content.match(/^\[reply:[^\]]+\]\s*(.*)$/);
+    return match ? match[1] : content;
+  }
+  if (content.startsWith('[uploading:')) {
+    return '⏳ Đang tải lên tệp...';
+  }
+  return content;
+}
+
 function isMediaMessage(content: string): boolean {
   return (
     content.startsWith('[image:') ||
@@ -56,7 +168,14 @@ function isMediaMessage(content: string): boolean {
 }
 
 export default function SearchPanel({ onClose, onNavigateToChannel }: SearchPanelProps) {
-  const [query, setQuery] = useState('');
+  const { 
+    activeWorkspaceId, 
+    setActiveChannelId, 
+    setScrollToMessageId, 
+    searchQuery, 
+    setSearchQuery 
+  } = useChatStore();
+  
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     try {
@@ -68,7 +187,6 @@ export default function SearchPanel({ onClose, onNavigateToChannel }: SearchPane
 
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
-  const { activeWorkspaceId, setActiveChannelId, setScrollToMessageId } = useChatStore();
   const currentUserStr = localStorage.getItem('user');
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
 
@@ -94,9 +212,9 @@ export default function SearchPanel({ onClose, onNavigateToChannel }: SearchPane
 
   // Debounce query
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query), 300);
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [searchQuery]);
 
   // Focus input on mount
   useEffect(() => {
@@ -111,6 +229,40 @@ export default function SearchPanel({ onClose, onNavigateToChannel }: SearchPane
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
+
+  const { pills, remainingText } = parsePillsAndInput(searchQuery);
+
+  const handleRemovePill = (pillIndex: number) => {
+    const updatedPills = pills.filter((_, idx) => idx !== pillIndex);
+    const newQuery = updatedPills.map(p => p.raw).join(' ') + (updatedPills.length > 0 ? ' ' : '') + remainingText;
+    setSearchQuery(newQuery);
+    
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !e.currentTarget.value) {
+      if (pills.length > 0) {
+        e.preventDefault();
+        const lastPill = pills[pills.length - 1];
+        const remainingPills = pills.slice(0, -1);
+        
+        const lastPillText = lastPill.raw;
+        const newQuery = remainingPills.map(p => p.raw).join(' ') + (remainingPills.length > 0 ? ' ' : '') + lastPillText;
+        
+        setSearchQuery(newQuery);
+        
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.setSelectionRange(lastPillText.length, lastPillText.length);
+          }
+        }, 0);
+      }
+    }
+  };
 
   // Collect all cached messages from queryClient
   const allMessages = useMemo((): SearchResult[] => {
@@ -138,36 +290,92 @@ export default function SearchPanel({ onClose, onNavigateToChannel }: SearchPane
       const msgs: ChatMessage[] = pages ? pages.flat() : Array.isArray(data) ? data : [];
 
       for (const msg of msgs) {
-        if (!isMediaMessage(msg.content)) {
-          results.push({ msg, channel, dmChannel, channelName });
-        }
+        results.push({ 
+          msg, 
+          channel, 
+          dmChannel, 
+          channelName,
+          displayContent: formatMessageContentForSearch(msg.content)
+        });
       }
     }
 
     return results;
   }, [queryClient, channels, dmChannels, currentUser?.id]);
 
+  const parsedFilters = useMemo(() => parseSearchQuery(debouncedQuery), [debouncedQuery]);
+
   // Filter by query
   const filteredResults = useMemo(() => {
     if (!debouncedQuery.trim()) return [];
-    const q = debouncedQuery.toLowerCase();
+    
+    const filters = parsedFilters;
+    const q = filters.textQuery.toLowerCase();
+    
     return allMessages
-      .filter(
-        (r) =>
-          r.msg.content.toLowerCase().includes(q) ||
-          r.msg.username.toLowerCase().includes(q)
-      )
+      .filter((r) => {
+        // 1. Text Query filter
+        if (q && !r.displayContent.toLowerCase().includes(q) && !r.msg.username.toLowerCase().includes(q)) {
+          return false;
+        }
+        
+        // 2. từ: (From User) filter
+        if (filters.fromUser) {
+          const fromU = filters.fromUser.toLowerCase();
+          if (r.msg.username.toLowerCase() !== fromU && r.msg.user_id !== fromU) {
+            return false;
+          }
+        }
+        
+        // 3. trong: (In Channel) filter
+        if (filters.inChannel) {
+          const inC = filters.inChannel.toLowerCase();
+          const cleanChanName = r.channelName.startsWith('#') ? r.channelName.slice(1) : r.channelName;
+          if (cleanChanName.toLowerCase() !== inC && r.msg.channel_id !== inC) {
+            return false;
+          }
+        }
+        
+        // 4. có: (Has data type) filter: link, file/tệp, image/ảnh, call/cuộc-gọi
+        if (filters.hasType) {
+          const type = filters.hasType.toLowerCase();
+          const content = r.msg.content;
+          
+          if (type === 'link') {
+            const hasLink = /https?:\/\/[^\s]+/.test(content);
+            if (!hasLink) return false;
+          } else if (type === 'tệp' || type === 'file') {
+            if (!content.startsWith('[file:')) return false;
+          } else if (type === 'ảnh' || type === 'image') {
+            if (!content.startsWith('[image:')) return false;
+          } else if (type === 'cuộc-gọi' || type === 'call') {
+            if (!content.startsWith('[call:')) return false;
+          } else {
+            return false;
+          }
+        }
+        
+        // 5. đề cập: (Mentions User) filter
+        if (filters.mentionsUser) {
+          const mentionsU = filters.mentionsUser.toLowerCase();
+          if (!r.msg.content.toLowerCase().includes(`@${mentionsU}`)) {
+            return false;
+          }
+        }
+        
+        return true;
+      })
       .sort((a, b) => {
         const ta = typeof a.msg.timestamp === 'string' ? new Date(a.msg.timestamp).getTime() : Number(a.msg.timestamp);
         const tb = typeof b.msg.timestamp === 'string' ? new Date(b.msg.timestamp).getTime() : Number(b.msg.timestamp);
         return tb - ta;
       })
       .slice(0, 50);
-  }, [debouncedQuery, allMessages]);
+  }, [debouncedQuery, allMessages, parsedFilters]);
 
   const handleNavigate = (result: SearchResult) => {
     // Save to recent searches
-    const newRecent = [query, ...recentSearches.filter((r) => r !== query)].slice(0, 5);
+    const newRecent = [searchQuery, ...recentSearches.filter((r) => r !== searchQuery)].slice(0, 5);
     setRecentSearches(newRecent);
     localStorage.setItem('recentSearches', JSON.stringify(newRecent));
 
@@ -207,20 +415,45 @@ export default function SearchPanel({ onClose, onNavigateToChannel }: SearchPane
 
       {/* Search Input */}
       <div className="p-4 border-b border-zinc-950/80 shrink-0">
-        <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/20 transition">
+        <div className="flex items-center flex-wrap gap-1.5 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-1.5 min-h-[38px] focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/20 transition">
           <Search className="w-4 h-4 text-zinc-500 shrink-0" />
+          
+          {/* Display completed pills */}
+          {pills.map((pill, idx) => (
+            <div 
+              key={idx}
+              className="flex items-center gap-1 bg-indigo-500/10 border border-indigo-500/20 dark:border-indigo-500/30 text-indigo-400 rounded px-1.5 py-0.5 text-[10px] font-bold select-none cursor-default"
+            >
+              <span>{pill.type === 'from' ? 'từ' : pill.type === 'in' ? 'trong' : pill.type === 'has' ? 'có' : 'đề cập'}: {pill.value}</span>
+              <button
+                onMouseDown={(e) => {
+                  e.preventDefault(); // Prevent blurring the input
+                  handleRemovePill(idx);
+                }}
+                className="hover:bg-indigo-500/20 rounded p-0.5 text-indigo-450 hover:text-white transition cursor-pointer border-0 outline-none bg-transparent"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          ))}
+
           <input
             ref={inputRef}
             type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm kiếm tin nhắn..."
-            className="flex-1 bg-transparent text-sm text-white placeholder-zinc-550 outline-none border-0 min-w-0"
+            value={remainingText}
+            onChange={(e) => {
+              const newVal = e.target.value;
+              const newQuery = pills.map(p => p.raw).join(' ') + (pills.length > 0 ? ' ' : '') + newVal;
+              setSearchQuery(newQuery);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={pills.length === 0 ? "Tìm kiếm tin nhắn..." : ''}
+            className="flex-1 bg-transparent text-sm text-white placeholder-zinc-550 outline-none border-0 min-w-[60px]"
           />
-          {query && (
+          {searchQuery && (
             <button
-              onClick={() => setQuery('')}
-              className="text-zinc-500 hover:text-white transition border-0 outline-none cursor-pointer"
+              onClick={() => setSearchQuery('')}
+              className="text-zinc-500 hover:text-white transition border-0 outline-none cursor-pointer ml-auto"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -255,7 +488,7 @@ export default function SearchPanel({ onClose, onNavigateToChannel }: SearchPane
               {recentSearches.map((recent, i) => (
                 <button
                   key={i}
-                  onClick={() => setQuery(recent)}
+                  onClick={() => setSearchQuery(recent)}
                   className="w-full flex items-center gap-2.5 p-2.5 bg-zinc-950/30 border border-zinc-850 rounded-xl hover:bg-zinc-850 hover:border-zinc-750 transition text-left cursor-pointer outline-none"
                 >
                   <Clock className="w-3.5 h-3.5 text-zinc-550 shrink-0" />
@@ -329,7 +562,7 @@ export default function SearchPanel({ onClose, onNavigateToChannel }: SearchPane
                         {result.msg.username}
                       </span>
                       <p className="text-xs text-zinc-450 mt-0.5 leading-relaxed line-clamp-3 break-words">
-                        {highlightText(result.msg.content, debouncedQuery)}
+                        {highlightText(result.displayContent, parsedFilters.textQuery)}
                       </p>
                     </div>
                     <ArrowRight className="w-3.5 h-3.5 text-zinc-650 shrink-0 mt-1 group-hover:text-indigo-400 transition" />
