@@ -1,21 +1,10 @@
 import { useRef, useEffect, useState } from 'react';
 import { X, MessageSquare, Send, ArrowDown, Megaphone } from 'lucide-react';
-import type { ChatMessage, WorkspaceMember, Channel, DMChannel } from '@/types';
+import type { ChatMessage } from '@/types';
 import MessageItem from './MessageItem';
-import { useQuery } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
-import api from '@/lib/api';
 import { getAvatarGradient } from '@/lib/utils';
-
-interface SuggestionItem {
-  type: 'special' | 'user';
-  id: string;
-  label: string;
-  email?: string;
-  description?: string;
-  isOnline?: boolean;
-  inChannel?: boolean;
-}
+import { useMentionAutocomplete } from '../hooks/useMentionAutocomplete';
 
 interface ThreadSidebarProps {
   parentMessage: ChatMessage & { replies?: ChatMessage[] };
@@ -30,7 +19,7 @@ export default function ThreadSidebar({
   onClose,
   onSendReply,
   currentUser,
-  unreadTimestamp
+  unreadTimestamp,
 }: ThreadSidebarProps) {
   const [content, setContent] = useState('');
   const [showNewRepliesBadge, setShowNewRepliesBadge] = useState(false);
@@ -40,90 +29,23 @@ export default function ThreadSidebar({
 
   const { activeWorkspaceId } = useChatStore();
 
-  // Autocomplete state
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [mentionStartIndex, setMentionStartIndex] = useState<number>(-1);
-  const [selectedIndex, setSelectedIndex] = useState<number>(0);
-
-  // Fetch workspace members
-  const { data: members = [] } = useQuery<WorkspaceMember[]>({
-    queryKey: ['workspace-members', activeWorkspaceId],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspaceId}/members`);
-      return res.data;
-    },
-    enabled: !!activeWorkspaceId,
+  // Use the extracted Mention Autocomplete hook
+  const {
+    mentionQuery,
+    selectedIndex,
+    setSelectedIndex,
+    filteredSuggestions,
+    handleSelectSuggestion,
+    handleKeyDown,
+    updateMentionStatus,
+  } = useMentionAutocomplete({
+    activeWorkspaceId,
+    channelId: parentMessage.channel_id,
+    currentUser,
+    text: content,
+    setText: setContent,
+    inputRef,
   });
-
-  // Fetch channels list
-  const { data: channels = [] } = useQuery<Channel[]>({
-    queryKey: ['channels', activeWorkspaceId],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspaceId}/channels`);
-      return res.data;
-    },
-    enabled: !!activeWorkspaceId,
-  });
-
-  // Fetch active DM channels
-  const { data: dmChannels = [] } = useQuery<DMChannel[]>({
-    queryKey: ['dms', activeWorkspaceId],
-    queryFn: async () => {
-      if (!activeWorkspaceId) return [];
-      const res = await api.get(`/workspaces/${activeWorkspaceId}/dms`);
-      return res.data;
-    },
-    enabled: !!activeWorkspaceId,
-  });
-
-  const activeChannel = channels.find((c) => c.id === parentMessage.channel_id);
-  const activeDmChannel = dmChannels.find((d) => d.id === parentMessage.channel_id);
-
-  // Fetch private channel members
-  const { data: channelMembers = [] } = useQuery<any[]>({
-    queryKey: ['channel-members', parentMessage.channel_id],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspaceId}/channels/${parentMessage.channel_id}/members`);
-      return res.data;
-    },
-    enabled: !!activeWorkspaceId && !!parentMessage.channel_id && !!activeChannel?.is_private,
-  });
-
-  const isMemberInActiveChannel = (userId: string) => {
-    if (!parentMessage.channel_id) return true;
-    if (activeDmChannel) {
-      return userId === activeDmChannel.user_one_id || userId === activeDmChannel.user_two_id;
-    }
-    if (activeChannel?.is_private) {
-      return channelMembers.some((cm) => cm.user_id === userId);
-    }
-    return true;
-  };
-
-  const checkMention = (val: string, cursorOffset: number) => {
-    const textBeforeCursor = val.substring(0, cursorOffset);
-    const match = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9_\u00C0-\u1EF9]*)$/);
-    if (match) {
-      const query = match[1];
-      const startIndex = textBeforeCursor.length - match[0].trimStart().length;
-      return { query, startIndex };
-    }
-    return null;
-  };
-
-  const updateMentionStatus = (val: string, cursorOffset: number | null) => {
-    if (cursorOffset === null) {
-      setMentionQuery(null);
-      return;
-    }
-    const check = checkMention(val, cursorOffset);
-    if (check) {
-      setMentionQuery(check.query);
-      setMentionStartIndex(check.startIndex);
-    } else {
-      setMentionQuery(null);
-    }
-  };
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -131,42 +53,6 @@ export default function ThreadSidebar({
     const cursor = e.target.selectionStart;
     updateMentionStatus(val, cursor);
     setSelectedIndex(0);
-  };
-
-  const handleSelectSuggestion = (item: SuggestionItem) => {
-    if (mentionQuery === null) return;
-    const cursor = inputRef.current?.selectionStart ?? content.length;
-    const beforeMention = content.substring(0, mentionStartIndex);
-    const afterMention = content.substring(cursor);
-    const mentionText = `@${item.label} `;
-    const newText = beforeMention + mentionText + afterMention;
-    setContent(newText);
-    setMentionQuery(null);
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        const newCursorPos = mentionStartIndex + mentionText.length;
-        inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
-      }
-    }, 10);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (mentionQuery !== null && filteredSuggestions.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % filteredSuggestions.length);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        handleSelectSuggestion(filteredSuggestions[selectedIndex]);
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        setMentionQuery(null);
-      }
-    }
   };
 
   // Auto scroll replies
@@ -217,7 +103,6 @@ export default function ThreadSidebar({
   // Close sidebar on Escape key
   useEffect(() => {
     const handleKeyDownEsc = (e: KeyboardEvent) => {
-      // Only close if not inside autocomplete selection
       if (e.key === 'Escape' && mentionQuery === null) {
         onClose();
       }
@@ -233,71 +118,6 @@ export default function ThreadSidebar({
     setContent('');
   };
 
-  // Build suggestions
-  const allSuggestions: SuggestionItem[] = [];
-  if (!activeDmChannel) {
-    allSuggestions.push({
-      type: 'special',
-      id: 'here',
-      label: 'here',
-      description: 'Notify every online member in this channel.',
-    });
-    allSuggestions.push({
-      type: 'special',
-      id: 'channel',
-      label: 'channel',
-      description: 'Notify everyone in this channel.',
-    });
-  }
-
-  const presenceUsers = useChatStore((state) => state.presenceUsers);
-  members.forEach((m) => {
-    if (m.user && m.user.id !== currentUser?.id) {
-      const status = presenceUsers[m.user.username];
-      const isOnline = status === 'online' || status === 'idle' || status === 'dnd';
-      allSuggestions.push({
-        type: 'user',
-        id: m.user.id,
-        label: m.user.username,
-        email: m.user.email,
-        isOnline,
-        inChannel: isMemberInActiveChannel(m.user.id),
-      });
-    }
-  });
-
-  const query = mentionQuery ? mentionQuery.toLowerCase() : '';
-  const filteredSuggestions = mentionQuery !== null
-    ? allSuggestions
-        .filter((item) => {
-          if (item.type === 'special') {
-            return item.label.toLowerCase().includes(query) || (item.description && item.description.toLowerCase().includes(query));
-          }
-          return (
-            item.label.toLowerCase().includes(query) ||
-            (item.email && item.email.toLowerCase().includes(query))
-          );
-        })
-        .sort((a, b) => {
-          const aPrefix = a.label.toLowerCase().startsWith(query);
-          const bPrefix = b.label.toLowerCase().startsWith(query);
-          if (aPrefix && !bPrefix) return -1;
-          if (!aPrefix && bPrefix) return 1;
-
-          const aInChannel = a.inChannel !== false;
-          const bInChannel = b.inChannel !== false;
-          if (aInChannel && !bInChannel) return -1;
-          if (!aInChannel && bInChannel) return 1;
-
-          const aOnline = a.isOnline || a.type === 'special';
-          const bOnline = b.isOnline || b.type === 'special';
-          if (aOnline && !bOnline) return -1;
-          if (!aOnline && bOnline) return 1;
-
-          return a.label.localeCompare(b.label);
-        })
-    : [];
-
   return (
     <div className="w-[360px] sm:w-[380px] md:w-[400px] border-l border-zinc-200 dark:border-zinc-950 bg-zinc-900 flex flex-col h-full shrink-0 z-20 animate-in slide-in-from-right duration-250 relative">
       {/* Thread Header */}
@@ -308,7 +128,7 @@ export default function ThreadSidebar({
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 hover:bg-zinc-800 text-zinc-500 hover:text-white rounded-lg transition border-0 outline-none cursor-pointer"
+          className="p-1.5 hover:bg-zinc-800 text-zinc-550 hover:text-white rounded-lg transition border-0 outline-none cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -322,7 +142,7 @@ export default function ThreadSidebar({
       >
         {/* Thread Root Parent Message */}
         <div className="bg-zinc-950/25 rounded-xl p-3 border border-zinc-850/80 shadow-sm">
-          <div className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase mb-2 select-none">
+          <div className="text-[10px] text-zinc-550 font-bold tracking-wider uppercase mb-2 select-none">
             Tin nhắn gốc
           </div>
           <MessageItem 
@@ -334,9 +154,9 @@ export default function ThreadSidebar({
         </div>
 
         <div className="flex items-center gap-2 my-1 select-none">
-          <div className="flex-1 h-[1px] bg-zinc-850" />
+          <div className="flex-1 h-[1px] bg-zinc-855" />
           <span className="text-[9px] text-zinc-550 font-bold tracking-widest uppercase">Phản hồi</span>
-          <div className="flex-1 h-[1px] bg-zinc-850" />
+          <div className="flex-1 h-[1px] bg-zinc-855" />
         </div>
 
         {/* Replies List */}
@@ -353,7 +173,7 @@ export default function ThreadSidebar({
               />
             ))
           ) : (
-            <div className="text-center py-10 text-zinc-600 text-xs select-none">
+            <div className="text-center py-10 text-zinc-650 text-xs select-none">
               Chưa có câu trả lời nào. Hãy là người đầu tiên phản hồi!
             </div>
           )}
@@ -402,7 +222,7 @@ export default function ThreadSidebar({
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {isSpecial ? (
-                        <div className="w-6 h-6 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                        <div className="w-6 h-6 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-455 shrink-0">
                           <Megaphone className="w-3.5 h-3.5" />
                         </div>
                       ) : (
@@ -433,8 +253,8 @@ export default function ThreadSidebar({
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       {!isInChannel && (
-                        <span className="text-[8px] font-semibold text-zinc-500 tracking-wide uppercase px-1.5 py-0.5 bg-zinc-900 border border-zinc-850 rounded-md shadow-sm">
-                          {activeDmChannel ? 'Không có trong DM' : 'Không có trong kênh'}
+                        <span className="text-[8px] font-semibold text-zinc-550 tracking-wide uppercase px-1.5 py-0.5 bg-zinc-900 border border-zinc-850 rounded-md shadow-sm">
+                          Không có trong kênh
                         </span>
                       )}
                       {isSelected && (
@@ -470,7 +290,7 @@ export default function ThreadSidebar({
               updateMentionStatus(content, cursor);
             }}
             placeholder={`Trả lời @${parentMessage.username}...`}
-            className="flex-1 bg-transparent px-3 py-1.5 text-sm text-white placeholder-zinc-500 outline-none border-0 min-w-0"
+            className="flex-1 bg-transparent px-3 py-1.5 text-sm text-white placeholder-zinc-550 outline-none border-0 min-w-0"
           />
           <button
             type="submit"

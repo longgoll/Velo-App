@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Bell, BellOff, Pin, Users, Settings, Image, FileText, Link2, ExternalLink, Hash, Volume2 } from 'lucide-react';
+import { X, Bell, BellOff, Pin, Users, Settings, FileText, Link2, Hash, Volume2 } from 'lucide-react';
 import type { ChatMessage, WorkspaceMember, Channel, DMChannel } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
@@ -9,61 +9,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from '@/store/useToastStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+import { parseImageContent, parseFileContent, extractLinks, getDomainName } from '../utils/mediaUtils';
+
 interface DetailsSidebarProps {
   onClose: () => void;
   messages: ChatMessage[];
   onOpenSettings?: () => void;
 }
-
-// Helpers to parse media
-const parseImageContent = (content: string) => {
-  if (!content.startsWith('[image:') || !content.endsWith(']')) {
-    return null;
-  }
-  const inner = content.slice(7, -1);
-  const firstColonIdx = inner.indexOf(':');
-  if (firstColonIdx === -1) return null;
-  const fileName = inner.slice(0, firstColonIdx);
-  const urlsPart = inner.slice(firstColonIdx + 1);
-
-  const httpMatch = urlsPart.match(/:(https?:\/\/)/);
-  if (httpMatch && httpMatch.index !== undefined) {
-    const originalUrl = urlsPart.slice(0, httpMatch.index);
-    return { fileName, url: originalUrl };
-  }
-  return { fileName, url: urlsPart };
-};
-
-const parseFileContent = (content: string) => {
-  if (!content.startsWith('[file:') || !content.endsWith(']')) {
-    return null;
-  }
-  const inner = content.slice(6, -1);
-  const firstColonIdx = inner.indexOf(':');
-  if (firstColonIdx === -1) return null;
-  const fileName = inner.slice(0, firstColonIdx);
-  const urlsPart = inner.slice(firstColonIdx + 1);
-
-  const lastColonIdx = urlsPart.lastIndexOf(':');
-  if (lastColonIdx === -1) {
-    return { fileName, url: urlsPart, size: 'Unknown' };
-  }
-  const url = urlsPart.slice(0, lastColonIdx);
-  const size = urlsPart.slice(lastColonIdx + 1);
-
-  return { fileName, url, size };
-};
-
-const extractLinks = (content: string) => {
-  // Ignore custom codes
-  if (content.startsWith('[image:') || content.startsWith('[file:') || content.startsWith('[call:')) {
-    return [];
-  }
-  // Simple url regex
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const matches = content.match(urlRegex);
-  return matches || [];
-};
 
 export default function DetailsSidebar({ onClose, messages, onOpenSettings }: DetailsSidebarProps) {
   const { activeWorkspaceId, activeChannelId, presenceUsers } = useChatStore();
@@ -187,15 +139,6 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
 
   const handleMembersClick = () => {
     toast.info(`Kênh này có ${visibleMembers.length} thành viên.`);
-  };
-
-  const getDomainName = (url: string) => {
-    try {
-      const hostname = new URL(url).hostname;
-      return hostname.startsWith('www.') ? hostname.substring(4) : hostname;
-    } catch {
-      return 'Liên kết';
-    }
   };
 
   const myRole = members.find(m => m.user_id === currentUser?.id)?.role || 'member';

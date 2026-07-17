@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
 import api from '@/lib/api';
-import axios from 'axios';
-import { Hash, PhoneCall, Video, MessageSquare, Upload, Sparkles, Plus, Compass, Layers, ArrowDown, Info } from 'lucide-react';
+import { Upload, ArrowDown } from 'lucide-react';
 import type { Channel, ChatMessage, Workspace, DMChannel } from '@/types';
 import MessageItem from './MessageItem';
 import ThreadSidebar from './ThreadSidebar';
@@ -15,66 +14,11 @@ import DMCallRoomView from './DMCallRoomView';
 import { useVoiceCall } from '@/context/VoiceCallContext';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import AllMessagesDashboard from './AllMessagesDashboard';
-
-// Helper function to compress images before upload
-const compressImage = (file: File): Promise<File> => {
-  return new Promise((resolve) => {
-    if (!file.type.startsWith('image/') || file.type.includes('gif')) {
-      return resolve(file);
-    }
-
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        
-        const MAX_DIM = 1280;
-        if (width > MAX_DIM || height > MAX_DIM) {
-          if (width > height) {
-            height = Math.round((height * MAX_DIM) / width);
-            width = MAX_DIM;
-          } else {
-            width = Math.round((width * MAX_DIM) / height);
-            height = MAX_DIM;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(file);
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              return resolve(file);
-            }
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            if (compressedFile.size >= file.size) {
-              resolve(file);
-            } else {
-              resolve(compressedFile);
-            }
-          },
-          'image/jpeg',
-          0.75
-        );
-      };
-      img.onerror = () => resolve(file);
-    };
-    reader.onerror = () => resolve(file);
-  });
-};
+import { buildMessageTree } from '../utils/messageTree';
+import { useChatFileUpload } from '../hooks/useChatFileUpload';
+import ChatViewportPlaceholders from './ChatViewportPlaceholders';
+import ChatHeader from './ChatHeader';
+import CallBanner from './CallBanner';
 
 const EMPTY_OBJECT: Record<string, number> = {};
 
@@ -113,15 +57,26 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   } = useVoiceCall();
 
   const parentRef = useRef<HTMLDivElement>(null);
-  const queryClient = useQueryClient();
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const [isCallMaximized, setIsCallMaximized] = useState(false);
 
   // Retrieve current user from local storage
-  const currentUserStr = localStorage.getItem('user');
+  const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+
+  // File Upload hook
+  const {
+    isDragging,
+    uploadFile,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = useChatFileUpload({
+    activeChannelId,
+    currentUser,
+    onSendMessage,
+  });
 
   // Selector for typing users
   const typingUsersState = useChatStore((state) => state.typingUsers[activeChannelId || '']);
@@ -202,7 +157,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
       }
     },
     enabled: !!activeChannelId && !!activeWorkspaceId && isVoiceOrDm,
-    refetchInterval: 3000, // Poll every 3 seconds to keep call banner and indicators snappy
+    refetchInterval: 3000,
   });
   const callParticipants = callParticipantsData || [];
 
@@ -245,171 +200,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     onSendMessage(activeChannelId, replyContent);
   };
 
-  const uploadFile = async (rawFile: File) => {
-    if (!activeChannelId) return;
-    const file = await compressImage(rawFile);
-    const fileId = `upload-${Date.now()}`;
-
-    // Add inline progress message
-    const progressMessage: ChatMessage & { uploadProgress?: number; fileName?: string; isUploading?: boolean } = {
-      id: fileId,
-      channel_id: activeChannelId,
-      user_id: currentUser?.id || 'me',
-      username: currentUser?.username || 'Me',
-      content: `[uploading:${file.name}]`,
-      timestamp: Date.now(),
-      uploadProgress: 0,
-      fileName: file.name,
-      isUploading: true,
-    };
-
-    queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-      return [...(old || []), progressMessage];
-    });
-
-    try {
-      // 1. Request presigned URL from Go Core API
-      const presignRes = await api.post('/attachments/presign', {
-        filename: file.name,
-        content_type: file.type,
-        size: file.size,
-      });
-
-      const { upload_url, download_url } = presignRes.data;
-
-      // 2. Upload file directly to SeaweedFS S3-API
-      await axios.put(upload_url, file, {
-        headers: {
-          'Content-Type': file.type,
-        },
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-              return (old || []).map((m: any) => {
-                if (m.id === fileId) {
-                  return { ...m, uploadProgress: progress };
-                }
-                return m;
-              });
-            });
-          }
-        },
-      });
-
-      // 3. Format message based on file type
-      const isImage = file.type.startsWith('image/');
-      const finalContent = isImage
-        ? `[image:${file.name}:${download_url}]`
-        : `[file:${file.name}:${download_url}:${(file.size / 1024).toFixed(1)} KB]`;
-
-      // 4. Update the local progress message state to complete
-      queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-        return (old || []).map((m: any) => {
-          if (m.id === fileId) {
-            return {
-              ...m,
-              content: finalContent,
-              isUploading: false,
-              uploadProgress: undefined,
-            };
-          }
-          return m;
-        });
-      });
-
-      // 5. Send message over WebSocket
-      onSendMessage(activeChannelId, finalContent);
-    } catch (err: any) {
-      console.error('File upload failed:', err);
-      // Remove progress message on failure
-      queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-        return (old || []).filter((m: any) => m.id !== fileId);
-      });
-    }
-  };
-
-  // Drag and Drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0 || !activeChannelId) return;
-    uploadFile(files[0]);
-  };
-
-  // Build message tree for replies
-  const buildMessageTree = () => {
-    type ExtendedMsg = ChatMessage & { replies?: ExtendedMsg[]; parentId?: string; parentUsername?: string };
-    const rootMessages: ExtendedMsg[] = [];
-    const messageMap: Record<string, ChatMessage & { replies: ExtendedMsg[]; parentId?: string; parentUsername?: string }> = {};
-    const parentMap: Record<string, string> = {}; // childId -> parentId
-
-    // 1. Initialize messageMap with copies and parse parents
-    messages.forEach((msg) => {
-      const replyMatch = msg.content.match(/^\[reply:([^:]+):([^\]]+)\]\s*(.*)/);
-      if (replyMatch) {
-        const [_, parentId, parentUsername, actualContent] = replyMatch;
-        parentMap[msg.id] = parentId;
-        messageMap[msg.id] = {
-          ...msg,
-          content: actualContent,
-          parentId,
-          parentUsername,
-          replies: []
-        };
-      } else {
-        messageMap[msg.id] = {
-          ...msg,
-          replies: []
-        };
-      }
-    });
-
-    // Helper to find the root parent ID in the thread
-    const findRootParentId = (childId: string): string => {
-      let currentId = childId;
-      const visited = new Set<string>();
-      while (parentMap[currentId] && !visited.has(currentId)) {
-        visited.add(currentId);
-        currentId = parentMap[currentId];
-      }
-      return currentId;
-    };
-
-    // 2. Build the hierarchy by flattening under root parents
-    messages.forEach((msg) => {
-      const mappedMsg = messageMap[msg.id];
-      if (!mappedMsg) return;
-
-      if (mappedMsg.parentId) {
-        const rootParentId = findRootParentId(msg.id);
-        if (messageMap[rootParentId]) {
-          messageMap[rootParentId].replies.push(mappedMsg);
-        } else {
-          // Root parent not found in active messages, treat as root but with reply headers
-          rootMessages.push(mappedMsg);
-        }
-      } else {
-        rootMessages.push(mappedMsg);
-      }
-    });
-
-    return rootMessages;
-  };
-
-  const structuredMessages = buildMessageTree();
+  const structuredMessages = buildMessageTree(messages);
 
   const firstUnreadMsg = messages.find((m) => m.id === firstUnreadMsgId);
   const unreadTimestamp = firstUnreadMsg ? firstUnreadMsg.timestamp : null;
@@ -438,7 +229,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   const handleScroll = () => {
     const container = parentRef.current;
     if (!container) return;
-    const threshold = 120; // threshold from bottom
+    const threshold = 120;
     const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
     isAtBottom.current = isNearBottom;
     if (isNearBottom) {
@@ -452,10 +243,9 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
       isAtBottom.current = true;
       setShowNewMessagesBadge(false);
       setFirstUnreadMsgId(null);
-      setActiveThreadId(null); // Clear active thread on channel navigation
-      setIsCallMaximized(false); // Reset call maximize on channel change
+      setActiveThreadId(null);
+      setIsCallMaximized(false);
       
-      // Auto-focus the chat input textarea/input
       setTimeout(() => {
         const inputEl = document.querySelector('input[placeholder^="Gửi tin nhắn đến"]') as HTMLInputElement;
         if (inputEl) {
@@ -463,7 +253,6 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
         }
       }, 50);
 
-      // Scroll to bottom instantly
       setTimeout(() => {
         if (parentRef.current) {
           parentRef.current.scrollTop = parentRef.current.scrollHeight;
@@ -486,7 +275,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     }
   }, [activeChannelId, messages, unreadChannels]);
 
-  // Track height changes and auto scroll if was at bottom (e.g. sidebar toggle or resize)
+  // Track height changes and auto scroll if was at bottom
   useEffect(() => {
     const container = parentRef.current;
     if (!container) return;
@@ -501,21 +290,18 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Auto Scroll to Bottom on new messages or trigger badge (preventing jump when reading history)
+  // Auto Scroll to Bottom on new messages
   useEffect(() => {
-    // If channel changed, just sync the refs and do nothing (handled by activeChannelId effect)
     if (activeChannelId !== prevChannelId.current) {
       prevChannelId.current = activeChannelId;
       prevMessagesLength.current = messages.length;
       return;
     }
 
-    // If new messages arrived in the same channel
     if (messages.length > prevMessagesLength.current) {
       const lastRawMessage = messages[messages.length - 1];
       const isReply = lastRawMessage && lastRawMessage.content.match(/^\[reply:/);
 
-      // Suppress scroll changes on incoming thread replies
       if (!isReply && structuredMessages.length > 0) {
         const lastMessage = structuredMessages[structuredMessages.length - 1];
         const isSentByMe = lastMessage.user_id === (currentUser?.id || 'me');
@@ -529,7 +315,6 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
       }
     }
     
-    // Always sync the length ref
     prevMessagesLength.current = messages.length;
   }, [messages.length, activeChannelId, structuredMessages, currentUser]);
 
@@ -566,80 +351,16 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   }
 
   if (!activeChannelId) {
-    const hasWorkspaces = workspaces.length > 0;
-    
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-zinc-950 text-center select-none relative overflow-hidden">
-        {/* Ambient background glow effects */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] rounded-full bg-indigo-500/10 blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-1/4 left-1/3 w-[250px] h-[250px] rounded-full bg-violet-500/5 blur-[80px] pointer-events-none" />
-
-        {/* Dynamic Island Voice call in case user navigates here */}
-        {activeVoiceChannelId && <DynamicIslandCall />}
-        
-        {!hasWorkspaces ? (
-          /* Premium Onboarding state for brand new users */
-          <div className="bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/80 rounded-3xl p-8 max-w-md w-full shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white mb-6 mx-auto shadow-lg shadow-indigo-500/20">
-              <Sparkles className="w-8 h-8 animate-pulse" />
-            </div>
-            
-            <h3 className="text-xl font-bold text-white tracking-tight">Chào mừng đến với Antigravity!</h3>
-            <p className="text-zinc-400 text-xs mt-2.5 mb-8 leading-relaxed">
-              Bắt đầu hành trình trò chuyện của bạn bằng cách tạo một không gian làm việc mới hoặc gia nhập không gian hiện có qua mã ID.
-            </p>
-
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => setShowCreateWs(true)}
-                className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold py-3 px-5 rounded-xl shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border-0 outline-none"
-              >
-                <Plus className="w-4 h-4" />
-                Tạo không gian mới
-              </button>
-              
-              <button
-                onClick={() => setShowJoinWs(true)}
-                className="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 hover:text-white text-zinc-300 font-semibold py-3 px-5 rounded-xl active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none"
-              >
-                <Compass className="w-4 h-4" />
-                Gia nhập không gian có sẵn
-              </button>
-            </div>
-          </div>
-        ) : activeWorkspaceId && channels.length === 0 ? (
-          /* Active workspace has no channels state */
-          <div className="bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/80 rounded-3xl p-8 max-w-md w-full shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 bg-zinc-950 border border-zinc-850 rounded-2xl flex items-center justify-center text-zinc-400 mb-6 mx-auto">
-              <Layers className="w-8 h-8 text-indigo-400" />
-            </div>
-            
-            <h3 className="text-xl font-bold text-white tracking-tight">Không gian của bạn còn trống</h3>
-            <p className="text-zinc-400 text-xs mt-2.5 mb-8 leading-relaxed">
-              Workspace này hiện tại chưa có kênh liên lạc nào. Hãy tạo kênh trò chuyện đầu tiên để bắt đầu kết nối với mọi người.
-            </p>
-
-            <button
-              onClick={() => setShowCreateChan(true)}
-              className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold py-3 px-5 rounded-xl shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border-0 outline-none"
-            >
-              <Plus className="w-4 h-4" />
-              Tạo kênh trò chuyện đầu tiên
-            </button>
-          </div>
-        ) : (
-          /* Default state when workspaces exist but none/no-channel is selected */
-          <div className="max-w-sm relative z-10 animate-in fade-in duration-300">
-            <div className="w-16 h-16 bg-zinc-900/80 border border-zinc-850 rounded-2xl flex items-center justify-center text-zinc-500 mb-5 mx-auto">
-              <MessageSquare className="w-8 h-8 text-indigo-500/70" />
-            </div>
-            <h3 className="text-lg font-bold text-white">Chọn Workspace hoặc Kênh để bắt đầu</h3>
-            <p className="text-zinc-500 text-xs mt-2 leading-relaxed">
-              Chọn một Workspace ở sidebar bên trái và chọn kênh chat bất kỳ từ Content Explorer để bắt đầu thảo luận.
-            </p>
-          </div>
-        )}
-      </div>
+      <ChatViewportPlaceholders
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+        channels={channels}
+        activeVoiceChannelId={activeVoiceChannelId}
+        setShowCreateWs={setShowCreateWs}
+        setShowJoinWs={setShowJoinWs}
+        setShowCreateChan={setShowCreateChan}
+      />
     );
   }
 
@@ -669,107 +390,35 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
             </div>
             <div className="text-center">
               <h3 className="text-sm font-bold text-white">Thả tệp tin vào đây</h3>
-              <p className="text-zinc-500 text-xs mt-1">Tải lên trực tiếp thông qua SeaweedFS</p>
+              <p className="text-zinc-550 text-xs mt-1">Tải lên trực tiếp thông qua SeaweedFS</p>
             </div>
           </div>
         )}
 
-        {/* 2. Dynamic Island Persistent Voice widget (only shown when Sidebar is hidden and not in the active channel's call) */}
+        {/* 2. Dynamic Island Persistent Voice widget */}
         {activeVoiceChannelId && !explorerOpen && activeVoiceChannelId !== activeChannelId && (
           <DynamicIslandCall />
         )}
 
         {/* Chat Header */}
-        <div className="px-6 h-[52px] border-b border-zinc-200 dark:border-zinc-950/80 flex items-center justify-between bg-white dark:bg-zinc-900/40 backdrop-blur-md shadow-sm shrink-0 z-10">
-          <div className="flex items-center gap-2 min-w-0">
-            {activeDmChannel ? (
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-            ) : (
-              <Hash className="w-5 h-5 text-zinc-500 shrink-0" />
-            )}
-            <span className="font-bold text-white text-sm truncate">
-              {chatTitle}
-            </span>
-            {activeDmChannel ? (
-              <span className="text-[8px] font-bold text-emerald-450 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full select-none ml-2 uppercase tracking-wide">
-                Trực tuyến
-              </span>
-            ) : (
-              <span className="text-[8px] font-bold text-indigo-450 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded-full select-none ml-2 uppercase tracking-wide">
-                Hoạt động
-              </span>
-            )}
-          </div>
+        <ChatHeader
+          activeDmChannel={activeDmChannel}
+          chatTitle={chatTitle}
+          handleStartVoiceCall={handleStartVoiceCall}
+          handleStartVideoCall={handleStartVideoCall}
+          showDetails={showDetails}
+          setShowDetails={setShowDetails}
+          setActiveThreadId={setActiveThreadId}
+          toggleExplorer={toggleExplorer}
+          explorerOpen={explorerOpen}
+        />
 
-          <div className="flex items-center gap-3">
-            {activeDmChannel && (
-              <>
-                <button
-                  onClick={handleStartVoiceCall}
-                  className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer"
-                  title="Bắt đầu cuộc gọi thoại"
-                >
-                  <PhoneCall className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleStartVideoCall}
-                  className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-emerald-500 transition outline-none border-0 cursor-pointer"
-                  title="Bắt đầu cuộc gọi video"
-                >
-                  <Video className="w-4 h-4" />
-                </button>
-              </>
-            )}
-            
-            <button
-              onClick={() => {
-                setShowDetails(!showDetails);
-                setActiveThreadId(null);
-              }}
-              className={`p-2 rounded-full transition outline-none border-0 cursor-pointer ${
-                showDetails 
-                  ? 'bg-indigo-600/15 text-indigo-400 hover:bg-indigo-500/25' 
-                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-              }`}
-              title="Thông tin nhóm / bạn bè"
-            >
-              <Info className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={toggleExplorer}
-              className="px-3 py-1 bg-zinc-800/80 text-xs text-zinc-300 rounded-lg hover:bg-zinc-700 hover:text-white transition outline-none border-0 cursor-pointer"
-              title="Ctrl + B"
-            >
-              {explorerOpen ? 'Ẩn Sidebar' : 'Hiện Sidebar'}
-            </button>
-          </div>
-        </div>
-
-        {/* 3. Active call indicator banner (for Text & DM channels) */}
-        {callParticipants.length > 0 && activeVoiceChannelId !== activeChannelId && (
-          <div className="mx-6 mt-3 px-4 py-3 bg-emerald-950/20 border border-emerald-500/20 rounded-2xl flex items-center justify-between backdrop-blur-md shadow-md animate-in slide-in-from-top duration-200 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 animate-pulse">
-                <PhoneCall className="w-4 h-4" />
-              </div>
-              <div className="text-left">
-                <div className="text-xs font-bold text-white">Cuộc gọi thoại đang diễn ra</div>
-                <div className="text-[10px] text-emerald-400 mt-0.5 font-medium">
-                  Đang trong cuộc gọi: {callParticipants.map((p: any) => p.name || p.identity).join(', ')}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                useChatStore.getState().setActiveVoiceChannelId(activeChannelId);
-              }}
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition duration-150 cursor-pointer border-0 active:scale-95 shadow-md shadow-emerald-600/15"
-            >
-              Tham gia
-            </button>
-          </div>
-        )}
+        {/* 3. Active call indicator banner */}
+        <CallBanner
+          callParticipants={callParticipants}
+          activeVoiceChannelId={activeVoiceChannelId}
+          activeChannelId={activeChannelId}
+        />
 
         {/* 4. DM Active Call Room */}
         {activeDmChannel && activeVoiceChannelId === activeChannelId && (
@@ -865,7 +514,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
               </div>
               
               {structuredMessages.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 text-zinc-600 select-none">
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-655 select-none">
                   <p className="text-xs">Bắt đầu cuộc trò chuyện tại #{chatTitle}</p>
                 </div>
               )}

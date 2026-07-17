@@ -1,24 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Smile, Megaphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useQuery } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
-import api from '@/lib/api';
 import { getAvatarGradient } from '@/lib/utils';
-import type { WorkspaceMember, Channel, DMChannel } from '@/types';
+import { useMentionAutocomplete } from '../hooks/useMentionAutocomplete';
 
 const EMOJIS = ['😀', '😂', '🔥', '👍', '❤️', '🎉', '🚀', '👀', '💯', '✨', '💻', '🙌'];
-
-interface SuggestionItem {
-  type: 'special' | 'user';
-  id: string;
-  label: string;
-  email?: string;
-  description?: string;
-  isOnline?: boolean;
-  inChannel?: boolean;
-}
 
 interface ChatInputProps {
   activeChannelId: string;
@@ -45,90 +33,36 @@ export default function ChatInput({
   const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
 
-  // Autocomplete state
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [mentionStartIndex, setMentionStartIndex] = useState<number>(-1);
-  const [selectedIndex, setSelectedIndex] = useState<number>(0);
-
-  // Fetch workspace members
-  const { data: members = [] } = useQuery<WorkspaceMember[]>({
-    queryKey: ['workspace-members', activeWorkspaceId],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspaceId}/members`);
-      return res.data;
-    },
-    enabled: !!activeWorkspaceId,
+  // Use the extracted Mention Autocomplete hook
+  const {
+    mentionQuery,
+    selectedIndex,
+    setSelectedIndex,
+    filteredSuggestions,
+    handleSelectSuggestion,
+    handleKeyDown,
+    updateMentionStatus,
+  } = useMentionAutocomplete({
+    activeWorkspaceId,
+    channelId: activeChannelId,
+    currentUser,
+    text,
+    setText,
+    inputRef,
   });
 
-  // Fetch channels list
-  const { data: channels = [] } = useQuery<Channel[]>({
-    queryKey: ['channels', activeWorkspaceId],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspaceId}/channels`);
-      return res.data;
-    },
-    enabled: !!activeWorkspaceId,
-  });
-
-  // Fetch active DM channels
-  const { data: dmChannels = [] } = useQuery<DMChannel[]>({
-    queryKey: ['dms', activeWorkspaceId],
-    queryFn: async () => {
-      if (!activeWorkspaceId) return [];
-      const res = await api.get(`/workspaces/${activeWorkspaceId}/dms`);
-      return res.data;
-    },
-    enabled: !!activeWorkspaceId,
-  });
-
-  const activeChannel = channels.find((c) => c.id === activeChannelId);
-  const activeDmChannel = dmChannels.find((d) => d.id === activeChannelId);
-
-  // Fetch private channel members
-  const { data: channelMembers = [] } = useQuery<any[]>({
-    queryKey: ['channel-members', activeChannelId],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspaceId}/channels/${activeChannelId}/members`);
-      return res.data;
-    },
-    enabled: !!activeWorkspaceId && !!activeChannelId && !!activeChannel?.is_private,
-  });
-
-  const isMemberInActiveChannel = (userId: string) => {
-    if (!activeChannelId) return true;
-    if (activeDmChannel) {
-      return userId === activeDmChannel.user_one_id || userId === activeDmChannel.user_two_id;
-    }
-    if (activeChannel?.is_private) {
-      return channelMembers.some((cm) => cm.user_id === userId);
-    }
-    return true;
-  };
-
-  const checkMention = (val: string, cursorOffset: number) => {
-    const textBeforeCursor = val.substring(0, cursorOffset);
-    const match = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9_\u00C0-\u1EF9]*)$/);
-    if (match) {
-      const query = match[1];
-      const startIndex = textBeforeCursor.length - match[0].trimStart().length;
-      return { query, startIndex };
-    }
-    return null;
-  };
-
-  const updateMentionStatus = (val: string, cursorOffset: number | null) => {
-    if (cursorOffset === null) {
-      setMentionQuery(null);
-      return;
-    }
-    const check = checkMention(val, cursorOffset);
-    if (check) {
-      setMentionQuery(check.query);
-      setMentionStartIndex(check.startIndex);
-    } else {
-      setMentionQuery(null);
-    }
-  };
+  // Close emoji picker on click outside
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.emoji-picker-container') && !target.closest('.emoji-picker-trigger')) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showEmojiPicker]);
 
   const autoTransformEmotes = (val: string): string => {
     const isAutoEmote = localStorage.getItem('chat_auto_emote') !== 'false';
@@ -171,42 +105,6 @@ export default function ChatInput({
     setSelectedIndex(0);
   };
 
-  const handleSelectSuggestion = (item: SuggestionItem) => {
-    if (mentionQuery === null) return;
-    const cursor = inputRef.current?.selectionStart ?? text.length;
-    const beforeMention = text.substring(0, mentionStartIndex);
-    const afterMention = text.substring(cursor);
-    const mentionText = `@${item.label} `;
-    const newText = beforeMention + mentionText + afterMention;
-    setText(newText);
-    setMentionQuery(null);
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        const newCursorPos = mentionStartIndex + mentionText.length;
-        inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
-      }
-    }, 10);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (mentionQuery !== null && filteredSuggestions.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % filteredSuggestions.length);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        handleSelectSuggestion(filteredSuggestions[selectedIndex]);
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        setMentionQuery(null);
-      }
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim() || !activeChannelId) return;
@@ -233,71 +131,6 @@ export default function ChatInput({
     setShowEmojiPicker(false);
     inputRef.current?.focus();
   };
-
-  // Build suggestions
-  const allSuggestions: SuggestionItem[] = [];
-  if (!activeDmChannel) {
-    allSuggestions.push({
-      type: 'special',
-      id: 'here',
-      label: 'here',
-      description: 'Notify every online member in this channel.',
-    });
-    allSuggestions.push({
-      type: 'special',
-      id: 'channel',
-      label: 'channel',
-      description: 'Notify everyone in this channel.',
-    });
-  }
-
-  const presenceUsers = useChatStore((state) => state.presenceUsers);
-  members.forEach((m) => {
-    if (m.user && m.user.id !== currentUser?.id) {
-      const status = presenceUsers[m.user.username];
-      const isOnline = status === 'online' || status === 'idle' || status === 'dnd';
-      allSuggestions.push({
-        type: 'user',
-        id: m.user.id,
-        label: m.user.username,
-        email: m.user.email,
-        isOnline,
-        inChannel: isMemberInActiveChannel(m.user.id),
-      });
-    }
-  });
-
-  const query = mentionQuery ? mentionQuery.toLowerCase() : '';
-  const filteredSuggestions = mentionQuery !== null
-    ? allSuggestions
-        .filter((item) => {
-          if (item.type === 'special') {
-            return item.label.toLowerCase().includes(query) || (item.description && item.description.toLowerCase().includes(query));
-          }
-          return (
-            item.label.toLowerCase().includes(query) ||
-            (item.email && item.email.toLowerCase().includes(query))
-          );
-        })
-        .sort((a, b) => {
-          const aPrefix = a.label.toLowerCase().startsWith(query);
-          const bPrefix = b.label.toLowerCase().startsWith(query);
-          if (aPrefix && !bPrefix) return -1;
-          if (!aPrefix && bPrefix) return 1;
-
-          const aInChannel = a.inChannel !== false;
-          const bInChannel = b.inChannel !== false;
-          if (aInChannel && !bInChannel) return -1;
-          if (!aInChannel && bInChannel) return 1;
-
-          const aOnline = a.isOnline || a.type === 'special';
-          const bOnline = b.isOnline || b.type === 'special';
-          if (aOnline && !bOnline) return -1;
-          if (!aOnline && bOnline) return 1;
-
-          return a.label.localeCompare(b.label);
-        })
-    : [];
 
   return (
     <div className="px-6 bg-white dark:bg-zinc-950/90 border-t border-zinc-200 dark:border-zinc-950/60 relative shrink-0 h-[52px] flex items-center shadow-[0_-2px_10px_rgba(0,0,0,0.03)] dark:shadow-none">
@@ -353,8 +186,8 @@ export default function ChatInput({
 
                   <div className="flex items-center gap-2 shrink-0">
                     {!isInChannel && (
-                      <span className="text-[9px] font-semibold text-zinc-500 tracking-wide uppercase px-2 py-0.5 bg-zinc-900 border border-zinc-850 rounded-md shadow-sm">
-                        {activeDmChannel ? 'Không có trong DM' : 'Không có trong kênh'}
+                      <span className="text-[9px] font-semibold text-zinc-550 tracking-wide uppercase px-2 py-0.5 bg-zinc-900 border border-zinc-850 rounded-md shadow-sm">
+                        Không có trong kênh
                       </span>
                     )}
                     {isSelected && (
@@ -372,12 +205,12 @@ export default function ChatInput({
 
       {/* Emoji Picker Popover */}
       {showEmojiPicker && (
-        <div className="absolute bottom-[60px] right-6 bg-zinc-950 border border-zinc-850 rounded-xl shadow-2xl p-2.5 z-20 flex gap-1.5 flex-wrap max-w-[220px] animate-in fade-in slide-in-from-bottom-2 duration-150">
+        <div className="absolute bottom-[60px] right-6 bg-zinc-950 border border-zinc-850 rounded-xl shadow-2xl p-2.5 z-20 flex gap-1.5 flex-wrap max-w-[220px] emoji-picker-container animate-in fade-in slide-in-from-bottom-2 duration-150">
           {EMOJIS.map((emoji) => (
             <button
               key={emoji}
               onClick={() => selectEmoji(emoji)}
-              className="text-base p-1.5 hover:bg-zinc-800 rounded-lg transition active:scale-90 cursor-pointer outline-none border-0"
+              className="text-base p-1.5 hover:bg-zinc-800 rounded-lg transition active:scale-90 cursor-pointer outline-none border-0 emoji-picker-trigger"
             >
               {emoji}
             </button>
@@ -433,7 +266,7 @@ export default function ChatInput({
         <button
           type="button"
           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className={`p-1.5 hover:bg-zinc-800 rounded-lg transition outline-none border-0 cursor-pointer ${showEmojiPicker ? 'text-indigo-400 bg-zinc-800' : 'text-zinc-500 hover:text-zinc-200'}`}
+          className={`p-1.5 hover:bg-zinc-800 rounded-lg transition outline-none border-0 cursor-pointer emoji-picker-trigger ${showEmojiPicker ? 'text-indigo-400 bg-zinc-800' : 'text-zinc-500 hover:text-zinc-200'}`}
           title="Chọn emoji"
         >
           <Smile className="w-4 h-4" />

@@ -211,7 +211,7 @@ export default function DMCallRoomView({
       <div className="px-4 py-2 border-b border-zinc-900/60 flex items-center justify-between bg-zinc-950/20">
         <div className="flex items-center gap-2">
           <Volume2 className="w-4 h-4 text-emerald-400 animate-pulse" />
-          <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Cuộc gọi Direct Message</span>
+          <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Cuộc gọi: {channelName}</span>
         </div>
         
         <div className="flex items-center gap-1.5">
