@@ -164,7 +164,7 @@ body {
 
 /* Theme Custom Variables and Overrides */
 :root {
-  --bg-app-sidebar: #f2f3f5;
+  --bg-app-sidebar: #ffffff;
   --bg-app-chat: #ffffff;
   --text-app-primary: #060607;
   --text-app-secondary: #4e5058;
@@ -199,34 +199,51 @@ body {
   background-color: #ffffff !important;
 }
 .light .bg-zinc-900 {
-  background-color: #f2f3f5 !important;
+  background-color: #ffffff !important;
 }
 .light .bg-zinc-900\/90 {
-  background-color: #f2f3f5 !important;
+  background-color: #ffffff !important;
 }
 .light .bg-zinc-900\/40 {
   background-color: #ffffff !important;
 }
 .light .bg-zinc-950\/40 {
-  background-color: #f2f3f5 !important;
+  background-color: #ffffff !important;
 }
 .light .bg-zinc-950\/90 {
-  background-color: #ebedf0 !important;
+  background-color: #ffffff !important;
 }
 .light .bg-zinc-800 {
-  background-color: #e3e5e8 !important;
+  background-color: #ffffff !important;
 }
 .light .bg-zinc-800\/80 {
-  background-color: #e3e5e8 !important;
+  background-color: #ffffff !important;
 }
 .light .bg-zinc-850 {
-  background-color: #d1d3d6 !important;
+  background-color: #ffffff !important;
 }
 .light .bg-zinc-700 {
-  background-color: #d1d3d6 !important;
+  background-color: #ffffff !important;
 }
 .light .bg-zinc-750 {
-  background-color: #d1d3d6 !important;
+  background-color: #ffffff !important;
+}
+
+/* Hover overrides to ensure visibility of hover actions on white backgrounds */
+.light .hover\:bg-zinc-900:hover {
+  background-color: #f2f3f5 !important;
+}
+.light .hover\:bg-zinc-800:hover {
+  background-color: #f2f3f5 !important;
+}
+.light .hover\:bg-zinc-800\/30:hover {
+  background-color: #f2f3f5 !important;
+}
+.light .hover\:bg-zinc-900\/50:hover {
+  background-color: #f2f3f5 !important;
+}
+.light .hover\:bg-zinc-950:hover {
+  background-color: #f2f3f5 !important;
 }
 
 /* Borders */
@@ -264,8 +281,8 @@ body {
 
 /* Specific elements that need clear light modes */
 .light div.w-\[64px\].bg-zinc-950 {
-  background-color: #e3e5e8 !important;
-  border-right-color: #e3e5e8 !important;
+  background-color: #ffffff !important;
+  border-right-color: var(--border-app) !important;
 }
 .light div.w-\[64px\] button.bg-indigo-600 {
   background-color: #5865F2 !important;

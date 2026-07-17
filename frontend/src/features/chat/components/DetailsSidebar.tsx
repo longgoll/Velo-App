@@ -202,9 +202,9 @@ export default function DetailsSidebar({ onClose, messages, onOpenSettings }: De
   const isOwnerOrAdmin = myRole === 'owner' || myRole === 'admin';
 
   return (
-    <div className="w-[320px] border-l border-zinc-950/60 bg-zinc-900/95 flex flex-col h-full shrink-0 z-20 animate-in slide-in-from-right duration-250 relative select-none">
+    <div className="w-[320px] border-l border-zinc-200 dark:border-zinc-950/60 bg-zinc-900/95 flex flex-col h-full shrink-0 z-20 animate-in slide-in-from-right duration-255 relative select-none">
       {/* Header */}
-      <div className="px-4 h-[52px] border-b border-zinc-950 flex items-center justify-between bg-zinc-900/40 backdrop-blur-md shrink-0">
+      <div className="px-4 h-[52px] border-b border-zinc-200 dark:border-zinc-950 flex items-center justify-between bg-white dark:bg-zinc-900/40 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-indigo-400" />
           <span className="font-bold text-white text-sm">Thông tin nhóm</span>

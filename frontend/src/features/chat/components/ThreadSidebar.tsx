@@ -299,9 +299,9 @@ export default function ThreadSidebar({
     : [];
 
   return (
-    <div className="w-[360px] sm:w-[380px] md:w-[400px] border-l border-zinc-950 bg-zinc-900 flex flex-col h-full shrink-0 z-20 animate-in slide-in-from-right duration-250 relative">
+    <div className="w-[360px] sm:w-[380px] md:w-[400px] border-l border-zinc-200 dark:border-zinc-950 bg-zinc-900 flex flex-col h-full shrink-0 z-20 animate-in slide-in-from-right duration-250 relative">
       {/* Thread Header */}
-      <div className="px-4 h-[52px] border-b border-zinc-950 flex items-center justify-between bg-zinc-900/40 backdrop-blur-md shrink-0">
+      <div className="px-4 h-[52px] border-b border-zinc-200 dark:border-zinc-950 flex items-center justify-between bg-white dark:bg-zinc-900/40 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-indigo-400" />
           <span className="font-bold text-white text-sm">Luồng thảo luận</span>

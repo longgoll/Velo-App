@@ -300,11 +300,11 @@ export default function ChatInput({
     : [];
 
   return (
-    <div className="px-6 pb-6 relative shrink-0">
+    <div className="px-6 bg-white dark:bg-zinc-950/90 border-t border-zinc-200 dark:border-zinc-950/60 relative shrink-0 h-[52px] flex items-center shadow-[0_-2px_10px_rgba(0,0,0,0.03)] dark:shadow-none">
       
       {/* Mention Auto-complete popover */}
       {mentionQuery !== null && filteredSuggestions.length > 0 && (
-        <div className="absolute bottom-20 left-6 right-6 bg-zinc-950/95 backdrop-blur-md border border-zinc-800/80 rounded-2xl shadow-2xl overflow-hidden max-h-[260px] overflow-y-auto z-30 animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="absolute bottom-[60px] left-6 right-6 bg-zinc-950/95 backdrop-blur-md border border-zinc-800/80 rounded-2xl shadow-2xl overflow-hidden max-h-[260px] overflow-y-auto z-30 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <div className="flex flex-col">
             {filteredSuggestions.map((item, idx) => {
               const isSelected = idx === selectedIndex;
@@ -372,7 +372,7 @@ export default function ChatInput({
 
       {/* Emoji Picker Popover */}
       {showEmojiPicker && (
-        <div className="absolute bottom-20 right-6 bg-zinc-950 border border-zinc-850 rounded-xl shadow-2xl p-2.5 z-20 flex gap-1.5 flex-wrap max-w-[220px] animate-in fade-in slide-in-from-bottom-2 duration-150">
+        <div className="absolute bottom-[60px] right-6 bg-zinc-950 border border-zinc-850 rounded-xl shadow-2xl p-2.5 z-20 flex gap-1.5 flex-wrap max-w-[220px] animate-in fade-in slide-in-from-bottom-2 duration-150">
           {EMOJIS.map((emoji) => (
             <button
               key={emoji}
@@ -395,7 +395,7 @@ export default function ChatInput({
 
       <form
         onSubmit={handleSubmit}
-        className="bg-zinc-900 border border-zinc-850 rounded-xl px-4 py-2 flex items-center gap-3 shadow-inner hover:border-zinc-800 focus-within:border-zinc-700/80 transition"
+        className="w-full bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-lg px-3 flex items-center gap-3 shadow-inner hover:border-zinc-300 dark:hover:border-zinc-700 focus-within:border-indigo-500/30 transition h-9"
       >
         {onFileUpload && (
           <button
@@ -427,7 +427,7 @@ export default function ChatInput({
             updateMentionStatus(text, cursor);
           }}
           placeholder={`Gửi tin nhắn đến #${channelName}`}
-          className="flex-1 bg-transparent border-0 text-white focus-visible:ring-0 focus-visible:ring-offset-0 px-0 text-sm placeholder-zinc-500 h-9 outline-none"
+          className="flex-1 bg-transparent border-0 text-white focus-visible:ring-0 focus-visible:ring-offset-0 px-0 text-sm placeholder-zinc-500 h-full outline-none"
         />
 
         <button
@@ -443,7 +443,7 @@ export default function ChatInput({
           <Button
             type="submit"
             size="icon"
-            className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg h-8 w-8 flex items-center justify-center shadow transition active:scale-95 shrink-0 cursor-pointer"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg h-7 w-7 flex items-center justify-center shadow transition active:scale-95 shrink-0 cursor-pointer"
             disabled={!text.trim()}
           >
             <Send className="w-4 h-4" />

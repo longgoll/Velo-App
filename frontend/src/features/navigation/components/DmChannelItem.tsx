@@ -45,15 +45,18 @@ export function DmChannelItem({
   });
 
   return (
-    <div className="flex flex-col gap-0.5 animate-in fade-in duration-255">
+    <div className="flex flex-col gap-0.5 animate-in fade-in duration-255 relative">
       <button
         onClick={() => handleChannelClick(dm.id)}
-        className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-xs font-medium transition outline-none border-0 bg-transparent text-left cursor-pointer ${
+        className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-xs font-semibold transition outline-none border-0 bg-transparent text-left cursor-pointer ${
           isActive
-            ? 'bg-zinc-800/80 text-white shadow-sm'
-            : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
+            ? 'bg-indigo-50 dark:bg-zinc-800/80 shadow-sm relative'
+            : 'text-zinc-550 dark:text-zinc-400 hover:bg-zinc-800/20 dark:hover:bg-zinc-800/30 hover:text-zinc-900 dark:hover:text-zinc-200'
         }`}
       >
+        {isActive && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-indigo-500 rounded-r-md" />
+        )}
         <div className="relative shrink-0">
           <Avatar size="sm" className={`shadow-[0_0_8px_rgba(0,0,0,0.3)] transition-all ${dm.status === 'online' ? 'ring-1 ring-emerald-500/20' : ''}`}>
             <AvatarFallback className={`text-[10px] font-semibold ${getAvatarGradient(dm.username)}`}>
@@ -63,7 +66,13 @@ export function DmChannelItem({
           <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 ${dm.statusColor} shadow-sm`} />
         </div>
         <div className="truncate text-left flex-1 min-w-0">
-          <div className={`truncate font-semibold text-zinc-200 ${isUserInThisVoice ? 'text-emerald-400' : ''}`}>{dm.username}</div>
+          <div className={`truncate font-semibold ${
+            isUserInThisVoice 
+              ? 'text-emerald-400' 
+              : isActive 
+                ? 'text-indigo-600 dark:text-zinc-200' 
+                : 'text-zinc-300 dark:text-zinc-200'
+          }`}>{dm.username}</div>
           <div className="text-[10px] text-zinc-500 font-normal truncate mt-0.5 capitalize flex items-center gap-1">
             {participants.length > 0 ? (
               <span className="text-emerald-400 font-semibold animate-pulse flex items-center gap-1">

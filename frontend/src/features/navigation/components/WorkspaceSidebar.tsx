@@ -96,12 +96,15 @@ export default function WorkspaceSidebar() {
                     setActiveFilter('all');
                     setActiveChannelId(null);
                   }}
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold hover:bg-indigo-600 hover:text-white hover:rounded-xl transition-all duration-300 shadow-lg relative outline-none border ${
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold transition-all duration-300 relative outline-none border ${
                     activeFilter === 'all'
-                      ? 'bg-indigo-600 text-white border-transparent'
-                      : 'bg-indigo-600/10 border-indigo-500/20 text-indigo-400 hover:border-transparent shadow-indigo-500/5'
+                      ? 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl shadow-sm'
+                      : 'bg-indigo-600/10 dark:bg-indigo-650/10 border-indigo-500/10 dark:border-indigo-500/20 text-indigo-400 hover:border-transparent hover:bg-indigo-600 hover:text-white hover:rounded-xl shadow-indigo-500/5'
                   }`}
                 >
+                  {activeFilter === 'all' && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-500 rounded-r-full" />
+                  )}
                   {activeWs ? (
                     <span className="text-sm font-semibold tracking-wider font-mono">
                       {activeWs.name.slice(0, 2).toUpperCase()}
@@ -136,8 +139,8 @@ export default function WorkspaceSidebar() {
                         onClick={() => setActiveFilter(filter.id)}
                         className={`w-11 h-11 rounded-2xl flex items-center justify-center cursor-pointer transition-all duration-300 relative group outline-none border-0 ${
                           isActive
-                            ? 'bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-600/20'
-                            : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 hover:rounded-xl'
+                            ? 'bg-indigo-50 dark:bg-zinc-800/80 text-indigo-600 dark:text-zinc-200 rounded-xl'
+                            : 'text-zinc-550 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:rounded-xl'
                         }`}
                       >
                         {/* Active Left Indicator */}

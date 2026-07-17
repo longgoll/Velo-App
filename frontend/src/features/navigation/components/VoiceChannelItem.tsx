@@ -48,19 +48,28 @@ export function VoiceChannelItem({
     <div className="flex flex-col gap-0.5 group relative animate-in fade-in duration-255">
       <button
         onClick={() => handleChannelClick(chan)}
-        className={`w-full flex items-center justify-between pl-2 pr-12 py-1.5 rounded-lg text-xs font-medium transition outline-none border-0 bg-transparent text-left cursor-pointer ${
+        className={`w-full flex items-center justify-between pl-2 pr-12 py-1.5 rounded-lg text-xs font-semibold transition outline-none border-0 bg-transparent text-left cursor-pointer ${
           activeChannelId === chan.id
-            ? 'bg-zinc-800/80 text-white'
-            : 'text-zinc-400 hover:bg-zinc-800/30 hover:text-zinc-200'
+            ? 'bg-indigo-50 dark:bg-zinc-800/80 shadow-sm relative'
+            : 'text-zinc-550 dark:text-zinc-400 hover:bg-zinc-800/20 dark:hover:bg-zinc-800/30 hover:text-zinc-900 dark:hover:text-zinc-200'
         }`}
       >
+        {activeChannelId === chan.id && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-indigo-500 rounded-r-md" />
+        )}
         <div className="flex items-center gap-2 truncate">
           {chan.is_private ? (
-            <Lock className={`w-3.5 h-3.5 ${isUserInThisVoice || participants.length > 0 ? 'text-emerald-400 animate-pulse' : 'text-zinc-500'}`} />
+            <Lock className={`w-3.5 h-3.5 ${activeChannelId === chan.id ? 'text-indigo-500 dark:text-zinc-350' : (isUserInThisVoice || participants.length > 0) ? 'text-emerald-400 animate-pulse' : 'text-zinc-500'}`} />
           ) : (
-            <Volume2 className={`w-3.5 h-3.5 ${isUserInThisVoice || participants.length > 0 ? 'text-emerald-400 animate-pulse' : 'text-zinc-500'}`} />
+            <Volume2 className={`w-3.5 h-3.5 ${activeChannelId === chan.id ? 'text-indigo-500 dark:text-zinc-350' : (isUserInThisVoice || participants.length > 0) ? 'text-emerald-400 animate-pulse' : 'text-zinc-500'}`} />
           )}
-          <span className={`truncate ${isUserInThisVoice ? 'text-emerald-400 font-semibold' : ''}`}>
+          <span className={`truncate ${
+            activeChannelId === chan.id 
+              ? 'text-indigo-600 dark:text-zinc-200' 
+              : isUserInThisVoice 
+                ? 'text-emerald-400 font-semibold' 
+                : 'text-zinc-550 dark:text-zinc-450'
+          }`}>
             {chan.name}
           </span>
         </div>

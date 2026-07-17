@@ -447,7 +447,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
   }
 
   return (
-    <div className="w-[240px] bg-zinc-900/90 backdrop-blur-md flex flex-col justify-between border-r border-zinc-950/60 h-full select-none shrink-0 transition-all duration-300">
+    <div className="w-[240px] bg-zinc-900/90 backdrop-blur-md flex flex-col justify-between border-r border-zinc-200 dark:border-zinc-950/60 h-full select-none shrink-0 transition-all duration-300">
       <div className="flex flex-col flex-1 min-h-0">
         
         {/* ================== WORKSPACES FILTER VIEW ================== */}
@@ -457,7 +457,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
             <div className="relative">
               <div 
                 onClick={() => setWsDropdownOpen(!wsDropdownOpen)}
-                className="px-4 py-3 h-[52px] border-b border-zinc-950/60 flex items-center justify-between cursor-pointer hover:bg-zinc-800/20 active:bg-zinc-800/40 transition-colors"
+                className="px-4 py-3 h-[52px] border-b border-zinc-200 dark:border-zinc-950/60 flex items-center justify-between cursor-pointer hover:bg-zinc-800/20 active:bg-zinc-800/40 transition-colors"
               >
                 <h1 className="font-bold text-white truncate text-sm flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
@@ -1024,7 +1024,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
       )}
 
       {/* Discord-style User Settings Bar at the bottom of ContentExplorer */}
-      <div className="relative px-2.5 py-2 bg-zinc-950/90 border-t border-zinc-950/60 flex items-center justify-between select-none h-[52px]">
+      <div className="relative px-2.5 py-2 bg-white dark:bg-zinc-950/90 border-t border-zinc-200 dark:border-zinc-950/60 flex items-center justify-between select-none h-[52px] shadow-[0_-2px_10px_rgba(0,0,0,0.03)] dark:shadow-none">
         {/* Left: User Info (Avatar + Name) */}
         <div className="flex items-center gap-2 min-w-0">
           <div 

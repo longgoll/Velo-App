@@ -680,7 +680,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
         )}
 
         {/* Chat Header */}
-        <div className="px-6 h-[52px] border-b border-zinc-950/80 flex items-center justify-between bg-zinc-900/40 backdrop-blur-md shadow-sm shrink-0 z-10">
+        <div className="px-6 h-[52px] border-b border-zinc-200 dark:border-zinc-950/80 flex items-center justify-between bg-white dark:bg-zinc-900/40 backdrop-blur-md shadow-sm shrink-0 z-10">
           <div className="flex items-center gap-2 min-w-0">
             {activeDmChannel ? (
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
