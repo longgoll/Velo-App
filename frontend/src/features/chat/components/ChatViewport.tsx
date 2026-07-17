@@ -194,7 +194,6 @@ export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
             if (m.id === fileId) {
               return {
                 ...m,
-                id: `m-file-${Date.now()}`,
                 content: finalContent,
                 isUploading: false,
                 uploadProgress: undefined,

@@ -56,6 +56,18 @@ export const useWebSocket = (token: string | null) => {
             if (!oldMessages) return [chatMsg];
             // Tránh duplicate tin nhắn nếu đã có
             if (oldMessages.some(m => m.id === chatMsg.id)) return oldMessages;
+
+            // Check if there is an optimistic upload message to replace
+            const uploadIndex = oldMessages.findIndex(m => 
+              m.id.startsWith('upload-') && 
+              (m.content === chatMsg.content || chatMsg.content.includes(m.content.replace('[uploading:', '').replace(']', '')))
+            );
+            if (uploadIndex !== -1) {
+              const updated = [...oldMessages];
+              updated[uploadIndex] = chatMsg;
+              return updated;
+            }
+
             return [...oldMessages, chatMsg];
           });
 
