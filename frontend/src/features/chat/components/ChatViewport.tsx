@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import api from '@/lib/api';
-import { Upload, ArrowDown } from 'lucide-react';
-import type { Channel, ChatMessage, Workspace, DMChannel } from '@/types';
+import { Upload, ArrowDown, Loader2 } from 'lucide-react';
+import type { Channel, ChatMessage, Workspace, DMChannel, WorkspaceMember } from '@/types';
 import MessageItem from './MessageItem';
 import ThreadSidebar from './ThreadSidebar';
 import DetailsSidebar from './DetailsSidebar';
@@ -20,14 +21,13 @@ import ChatViewportPlaceholders from './ChatViewportPlaceholders';
 import ChatHeader from './ChatHeader';
 import CallBanner from './CallBanner';
 
-const EMPTY_OBJECT: Record<string, number> = {};
 
 interface ChatViewportProps {
   onSendMessage: (channelId: string, content: string) => void;
-  onSendTyping: (channelId: string) => void;
+
 }
 
-export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewportProps) {
+export default function ChatViewport({ onSendMessage }: ChatViewportProps) {
   const { 
     activeWorkspaceId, 
     activeChannelId, 
@@ -61,9 +61,8 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   const [showDetails, setShowDetails] = useState(false);
   const [isCallMaximized, setIsCallMaximized] = useState(false);
 
-  // Retrieve current user from local storage
-  const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+  // ✅ useCurrentUser hook thay vì JSON.parse mỗi render
+  const currentUser = useCurrentUser();
 
   // File Upload hook
   const {
@@ -78,33 +77,13 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     onSendMessage,
   });
 
-  // Selector for typing users
-  const typingUsersState = useChatStore((state) => state.typingUsers[activeChannelId || '']);
-  const activeTyping = typingUsersState || EMPTY_OBJECT;
-  const typingUsers = Object.keys(activeTyping).filter(
-    (username) => username !== currentUser?.username && Date.now() - activeTyping[username] < 4000
-  );
-
-  // Timer to clean up typing indicators automatically
-  const [, forceUpdate] = useState({});
-  useEffect(() => {
-    const hasTyping = Object.values(activeTyping).some(
-      (ts) => Date.now() - ts < 4000
-    );
-    if (hasTyping) {
-      const timer = setInterval(() => {
-        forceUpdate({});
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [activeTyping]);
-
   // Scroll and unread optimization states
   const [showNewMessagesBadge, setShowNewMessagesBadge] = useState(false);
   const [firstUnreadMsgId, setFirstUnreadMsgId] = useState<string | null>(null);
   const isAtBottom = useRef(true);
   const prevMessagesLength = useRef(0);
   const prevChannelId = useRef<string | null>(null);
+  const scrollRAF = useRef<number>(0);
 
   // Fetch workspaces (cached from queryClient)
   const { data: workspacesData } = useQuery<Workspace[]>({
@@ -144,6 +123,16 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   const activeDmChannel = dmChannels.find((d) => d.id === activeChannelId);
   const isVoiceOrDm = !!activeDmChannel || (!!activeChannel && activeChannel.type === 'voice');
 
+  // ✅ Fetch workspace members ONCE — pass xuống MessageItem qua props
+  const { data: members = [] } = useQuery<WorkspaceMember[]>({
+    queryKey: ['workspace-members', activeWorkspaceId],
+    queryFn: async () => {
+      const res = await api.get(`/workspaces/${activeWorkspaceId}/members`);
+      return res.data;
+    },
+    enabled: !!activeWorkspaceId,
+  });
+
   // Fetch active call participants for the current channel to show status banner
   const { data: callParticipantsData } = useQuery<any[]>({
     queryKey: ['call-participants', activeChannelId],
@@ -161,46 +150,58 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   });
   const callParticipants = callParticipantsData || [];
 
-  // Fetch messages from ScyllaDB history via Core API
-  const { data: messagesData } = useQuery<ChatMessage[]>({
+  // ✅ Infinite Query — fetch messages với cursor-based pagination
+  const {
+    data: messagesData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['messages', activeChannelId],
-    queryFn: async () => {
+    queryFn: async ({ pageParam }) => {
       if (!activeChannelId) return [];
-      
-      const res = await api.get(`/channels/${activeChannelId}/messages?limit=50`);
+      const cursor = pageParam ? `&before=${pageParam}` : '';
+      const res = await api.get(`/channels/${activeChannelId}/messages?limit=50${cursor}`);
       const msgs = res.data as ChatMessage[];
       return [...msgs].reverse();
     },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => {
+      // Nếu page trả về < 50, không còn data cũ hơn
+      if (!lastPage || lastPage.length < 50) return undefined;
+      return lastPage[0]?.id; // cursor = oldest message ID in this page
+    },
     enabled: !!activeChannelId,
   });
-  const messages = messagesData || [];
+
+  // ✅ Flatten pages thành flat array, memoized
+  const messages = useMemo(
+    () => messagesData?.pages.flatMap((p) => p) ?? [],
+    [messagesData]
+  );
 
   // Intercept sending messages to handle reply prefixes
-  const handleSendMessage = (channelId: string, content: string) => {
+  const handleSendMessage = useCallback((channelId: string, content: string) => {
     onSendMessage(channelId, content);
-  };
+  }, [onSendMessage]);
 
-  const handleStartVoiceCall = () => {
+  const handleStartVoiceCall = useCallback(() => {
     if (!activeChannelId) return;
     useChatStore.getState().setActiveVoiceChannelId(activeChannelId);
     handleSendMessage(activeChannelId, '[call:voice:active]');
-  };
+  }, [activeChannelId, handleSendMessage]);
 
-  const handleStartVideoCall = () => {
+  const handleStartVideoCall = useCallback(() => {
     if (!activeChannelId) return;
     useChatStore.getState().setActiveVoiceChannelId(activeChannelId);
     handleSendMessage(activeChannelId, '[call:video:active]');
-  };
+  }, [activeChannelId, handleSendMessage]);
 
-  // Send a threaded reply message
-  const handleSendThreadReply = (content: string) => {
-    if (!activeThreadMessage || !activeChannelId) return;
-
-    const replyContent = `[reply:${activeThreadMessage.id}:${activeThreadMessage.username}] ${content}`;
-    onSendMessage(activeChannelId, replyContent);
-  };
-
-  const structuredMessages = buildMessageTree(messages);
+  // ✅ useMemo cho buildMessageTree — tránh tính lại mỗi render
+  const structuredMessages = useMemo(
+    () => buildMessageTree(messages),
+    [messages]
+  );
 
   const firstUnreadMsg = messages.find((m) => m.id === firstUnreadMsgId);
   const unreadTimestamp = firstUnreadMsg ? firstUnreadMsg.timestamp : null;
@@ -209,33 +210,78 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     ? structuredMessages.find(m => m.id === activeThreadId)
     : null;
 
+  // Send a threaded reply message
+  const handleSendThreadReply = useCallback((content: string) => {
+    if (!activeThreadMessage || !activeChannelId) return;
+    const replyContent = `[reply:${activeThreadMessage.id}:${activeThreadMessage.username}] ${content}`;
+    onSendMessage(activeChannelId, replyContent);
+  }, [activeThreadMessage, activeChannelId, onSendMessage]);
+
+  // ✅ Adaptive estimateSize — ước lượng chiều cao dựa trên content
+  const getEstimatedSize = useCallback((index: number) => {
+    const msg = structuredMessages[index];
+    if (!msg) return 75;
+    if (msg.content.startsWith('[image:')) return 280;
+    if (msg.content.startsWith('[file:')) return 90;
+    if (msg.content.startsWith('[call:')) return 100;
+    if (msg.content.startsWith('[uploading:')) return 90;
+    if (msg.content.length > 200) return 120;
+    if (msg.replies && msg.replies.length > 0) return 110;
+    return 75;
+  }, [structuredMessages]);
+
   // Initialize TanStack React Virtual for virtualization
   const rowVirtualizer = useVirtualizer({
     count: structuredMessages.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 75,
+    estimateSize: getEstimatedSize,
+    overscan: 5,
   });
 
   // Scroll to bottom helper
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     if (parentRef.current && structuredMessages.length > 0) {
       rowVirtualizer.scrollToIndex(structuredMessages.length - 1, { align: 'end', behavior: 'smooth' });
     }
     setShowNewMessagesBadge(false);
     isAtBottom.current = true;
-  };
+  }, [rowVirtualizer, structuredMessages.length]);
 
-  // Handle scroll events directly on container
-  const handleScroll = () => {
-    const container = parentRef.current;
-    if (!container) return;
-    const threshold = 120;
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
-    isAtBottom.current = isNearBottom;
-    if (isNearBottom) {
-      setShowNewMessagesBadge(false);
-    }
-  };
+  // ✅ RAF-batched scroll handler — giảm state updates
+  const handleScroll = useCallback(() => {
+    cancelAnimationFrame(scrollRAF.current);
+    scrollRAF.current = requestAnimationFrame(() => {
+      const container = parentRef.current;
+      if (!container) return;
+      const threshold = 120;
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
+      isAtBottom.current = isNearBottom;
+      if (isNearBottom) {
+        setShowNewMessagesBadge(false);
+      }
+    });
+  }, []);
+
+  // ✅ Infinite scroll — load older messages khi scroll gần đầu
+  useEffect(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (el.scrollTop < 200 && hasNextPage && !isFetchingNextPage) {
+        const prevHeight = el.scrollHeight;
+        fetchNextPage().then(() => {
+          // Giữ vị trí scroll không nhảy khi prepend data cũ
+          requestAnimationFrame(() => {
+            if (parentRef.current) {
+              parentRef.current.scrollTop = parentRef.current.scrollHeight - prevHeight;
+            }
+          });
+        });
+      }
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // On active channel change, autoscroll to bottom instantly, auto-focus input, and clear unread badge
   useEffect(() => {
@@ -318,6 +364,11 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     prevMessagesLength.current = messages.length;
   }, [messages.length, activeChannelId, structuredMessages, currentUser]);
 
+  // Cleanup RAF on unmount
+  useEffect(() => {
+    return () => cancelAnimationFrame(scrollRAF.current);
+  }, []);
+
   if (activeFilter === 'all' && !activeChannelId) {
     return <AllMessagesDashboard onSendMessage={handleSendMessage} />;
   }
@@ -372,6 +423,30 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   } else if (activeChannel) {
     chatTitle = activeChannel.name;
   }
+
+  // onReplyClick handler — stable reference
+  const handleReplyClick = (message: ChatMessage) => {
+    let currentMsg = message;
+    const visited = new Set<string>();
+    
+    while (currentMsg && !visited.has(currentMsg.id)) {
+      visited.add(currentMsg.id);
+      const match = currentMsg.content.match(/^\[reply:([^:]+):/);
+      if (match) {
+        const parentId = match[1];
+        const parentMsg = messages.find(m => m.id === parentId);
+        if (parentMsg) {
+          currentMsg = parentMsg;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    setActiveThreadId(currentMsg.id);
+    setShowDetails(false);
+  };
 
   return (
     <div 
@@ -446,7 +521,16 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
               ref={parentRef}
               onScroll={handleScroll}
               className="flex-1 px-6 py-4 overflow-y-auto no-scrollbar"
+              style={{ contain: 'strict' }}
             >
+              {/* Loading indicator for older messages */}
+              {isFetchingNextPage && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                  <span className="ml-2 text-xs text-zinc-500">Đang tải tin nhắn cũ hơn...</span>
+                </div>
+              )}
+
               <div
                 style={{
                   height: `${rowVirtualizer.getTotalSize()}px`,
@@ -469,6 +553,8 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
                         left: 0,
                         width: '100%',
                         transform: `translateY(${virtualRow.start}px)`,
+                        willChange: 'transform',
+                        contain: 'content',
                       }}
                       className="py-1 flex flex-col"
                     >
@@ -483,28 +569,8 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
                       )}
                       <MessageItem 
                         msg={msg} 
-                        onReplyClick={(message) => {
-                          let currentMsg = message;
-                          const visited = new Set<string>();
-                          
-                          while (currentMsg && !visited.has(currentMsg.id)) {
-                            visited.add(currentMsg.id);
-                            const match = currentMsg.content.match(/^\[reply:([^:]+):/);
-                            if (match) {
-                              const parentId = match[1];
-                              const parentMsg = messages.find(m => m.id === parentId);
-                              if (parentMsg) {
-                                currentMsg = parentMsg;
-                              } else {
-                                break;
-                              }
-                            } else {
-                              break;
-                            }
-                          }
-                          setActiveThreadId(currentMsg.id);
-                          setShowDetails(false);
-                        }}
+                        members={members}
+                        onReplyClick={handleReplyClick}
                         unreadTimestamp={unreadTimestamp}
                         isActiveThread={activeThreadId === msg.id}
                       />
@@ -531,30 +597,12 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
               </button>
             )}
 
-            {/* Typing Indicator */}
-            {typingUsers.length > 0 && (
-              <div className="px-6 pb-1.5 text-xs text-zinc-400 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-150">
-                <div className="flex gap-1 items-center">
-                  <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-                <span>
-                  <span className="font-semibold text-zinc-300">
-                    {typingUsers.join(', ')}
-                  </span>{' '}
-                  đang nhập...
-                </span>
-              </div>
-            )}
-
             {/* Chat Input */}
             <ChatInput
               activeChannelId={activeChannelId}
               channelName={chatTitle}
               onSendMessage={handleSendMessage}
               onFileUpload={uploadFile}
-              onTyping={() => onSendTyping(activeChannelId)}
             />
           </>
         )}
@@ -568,6 +616,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
           onSendReply={handleSendThreadReply}
           currentUser={currentUser}
           unreadTimestamp={unreadTimestamp}
+          members={members}
         />
       ) : showDetails && !isCallMaximized ? (
         <DetailsSidebar

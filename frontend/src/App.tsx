@@ -85,7 +85,8 @@ export default function App() {
   };
 
   // WebSocket connection
-  const { sendMessage, sendTyping } = useWebSocket(token);
+  const { sendMessage } = useWebSocket(token);
+
 
   // Fetch logged in user data
   useEffect(() => {
@@ -178,7 +179,8 @@ export default function App() {
           <ContentExplorer onLogout={handleLogout} />
 
           {/* 3. Main Chat Viewport */}
-          <ChatViewport onSendMessage={sendMessage} onSendTyping={sendTyping} />
+          <ChatViewport onSendMessage={sendMessage} />
+
 
           {/* --- Dialog / Modals --- */}
           <CreateWorkspaceModal open={showCreateWs} onOpenChange={setShowCreateWs} />

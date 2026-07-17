@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { X, MessageSquare, Send, ArrowDown, Megaphone } from 'lucide-react';
-import type { ChatMessage } from '@/types';
+import type { ChatMessage, WorkspaceMember } from '@/types';
 import MessageItem from './MessageItem';
 import { useChatStore } from '@/store/useChatStore';
 import { getAvatarGradient } from '@/lib/utils';
@@ -12,6 +12,7 @@ interface ThreadSidebarProps {
   onSendReply: (content: string) => void;
   currentUser: any;
   unreadTimestamp?: string | number | null;
+  members?: WorkspaceMember[];
 }
 
 export default function ThreadSidebar({
@@ -20,6 +21,7 @@ export default function ThreadSidebar({
   onSendReply,
   currentUser,
   unreadTimestamp,
+  members = [],
 }: ThreadSidebarProps) {
   const [content, setContent] = useState('');
   const [showNewRepliesBadge, setShowNewRepliesBadge] = useState(false);
@@ -148,6 +150,7 @@ export default function ThreadSidebar({
           <MessageItem 
             msg={parentMessage} 
             onReplyClick={() => {}} 
+            members={members}
             isReplyChild={true} 
             hideReply={true} 
           />
@@ -167,6 +170,7 @@ export default function ThreadSidebar({
                 key={reply.id} 
                 msg={reply} 
                 onReplyClick={() => {}} 
+                members={members}
                 isReplyChild={true} 
                 hideReply={true} 
                 unreadTimestamp={unreadTimestamp}

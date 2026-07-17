@@ -96,8 +96,35 @@ export function useChatFileUpload({
       isUploading: true,
     };
 
-    queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-      return [...(old || []), progressMessage];
+    // ✅ Helper to update messages in both InfiniteQuery and legacy format
+    const updateQueryData = (
+      updater: (messages: any[]) => any[]
+    ) => {
+      queryClient.setQueryData(['messages', activeChannelId], (oldData: any) => {
+        if (!oldData) return oldData;
+        if (oldData.pages) {
+          // InfiniteQuery — apply to last page
+          const pages = [...oldData.pages];
+          const lastIdx = pages.length - 1;
+          pages[lastIdx] = updater(pages[lastIdx] || []);
+          return { ...oldData, pages };
+        }
+        return updater(oldData || []);
+      });
+    };
+
+    // Append progress message
+    queryClient.setQueryData(['messages', activeChannelId], (oldData: any) => {
+      if (!oldData) {
+        return { pages: [[progressMessage]], pageParams: [undefined] };
+      }
+      if (oldData.pages) {
+        const pages = [...oldData.pages];
+        const lastIdx = pages.length - 1;
+        pages[lastIdx] = [...(pages[lastIdx] || []), progressMessage];
+        return { ...oldData, pages };
+      }
+      return [...(oldData || []), progressMessage];
     });
 
     try {
@@ -118,14 +145,11 @@ export function useChatFileUpload({
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-              return (old || []).map((m: any) => {
-                if (m.id === fileId) {
-                  return { ...m, uploadProgress: progress };
-                }
-                return m;
-              });
-            });
+            updateQueryData((msgs) =>
+              msgs.map((m: any) =>
+                m.id === fileId ? { ...m, uploadProgress: progress } : m
+              )
+            );
           }
         },
       });
@@ -137,28 +161,20 @@ export function useChatFileUpload({
         : `[file:${file.name}:${download_url}:${(file.size / 1024).toFixed(1)} KB]`;
 
       // 4. Update the local progress message state to complete
-      queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-        return (old || []).map((m: any) => {
-          if (m.id === fileId) {
-            return {
-              ...m,
-              content: finalContent,
-              isUploading: false,
-              uploadProgress: undefined,
-            };
-          }
-          return m;
-        });
-      });
+      updateQueryData((msgs) =>
+        msgs.map((m: any) =>
+          m.id === fileId
+            ? { ...m, content: finalContent, isUploading: false, uploadProgress: undefined }
+            : m
+        )
+      );
 
       // 5. Send message over WebSocket
       onSendMessage(activeChannelId, finalContent);
     } catch (err: any) {
       console.error('File upload failed:', err);
       // Remove progress message on failure
-      queryClient.setQueryData(['messages', activeChannelId], (old: any) => {
-        return (old || []).filter((m: any) => m.id !== fileId);
-      });
+      updateQueryData((msgs) => msgs.filter((m: any) => m.id !== fileId));
     }
   };
 

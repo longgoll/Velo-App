@@ -126,19 +126,64 @@ export const useWebSocket = (token: string | null) => {
             }
           }
           
-          // Cập nhật ngầm dữ liệu cache của TanStack Query cho channel tương ứng
-          queryClient.setQueryData(['messages', chatMsg.channel_id], (oldMessages: ChatMessage[] | undefined) => {
-            if (!oldMessages) return isReactionUpdate ? undefined : [chatMsg];
-            // Tránh duplicate tin nhắn, nhưng cập nhật nội dung nếu có thay đổi (ví dụ: ảnh thumbnail)
+          // ✅ Cập nhật cache — hỗ trợ cả InfiniteQuery pages và legacy array
+          queryClient.setQueryData(['messages', chatMsg.channel_id], (oldData: any) => {
+            if (!oldData) {
+              // Khi chưa có data, tạo InfiniteQuery structure
+              if (isReactionUpdate) return undefined;
+              return {
+                pages: [[chatMsg]],
+                pageParams: [undefined],
+              };
+            }
+
+            // ✅ InfiniteQuery pages structure
+            if (oldData.pages) {
+              const allMessages = oldData.pages.flat() as ChatMessage[];
+              
+              // Duplicate check — cập nhật nếu đã có (ví dụ: thumbnail update)
+              if (allMessages.some((m: ChatMessage) => m.id === chatMsg.id)) {
+                return {
+                  ...oldData,
+                  pages: oldData.pages.map((page: ChatMessage[]) =>
+                    page.map((m: ChatMessage) => m.id === chatMsg.id ? chatMsg : m)
+                  ),
+                };
+              }
+
+              if (isReactionUpdate) return oldData;
+
+              // Check optimistic upload message
+              const lastPage = oldData.pages[oldData.pages.length - 1] as ChatMessage[];
+              const uploadIndex = lastPage.findIndex((m: ChatMessage) =>
+                m.id.startsWith('upload-') &&
+                (m.content === chatMsg.content || chatMsg.content.includes(m.content.replace('[uploading:', '').replace(']', '')))
+              );
+              if (uploadIndex !== -1) {
+                const updatedPage = [...lastPage];
+                updatedPage[uploadIndex] = chatMsg;
+                return {
+                  ...oldData,
+                  pages: [...oldData.pages.slice(0, -1), updatedPage],
+                };
+              }
+
+              // Append to last page
+              return {
+                ...oldData,
+                pages: [
+                  ...oldData.pages.slice(0, -1),
+                  [...lastPage, chatMsg],
+                ],
+              };
+            }
+
+            // Legacy simple array fallback
+            const oldMessages = oldData as ChatMessage[];
             if (oldMessages.some(m => m.id === chatMsg.id)) {
               return oldMessages.map(m => m.id === chatMsg.id ? chatMsg : m);
             }
-
-            if (isReactionUpdate) {
-              return oldMessages;
-            }
-
-            // Check if there is an optimistic upload message to replace
+            if (isReactionUpdate) return oldMessages;
             const uploadIndex = oldMessages.findIndex(m => 
               m.id.startsWith('upload-') && 
               (m.content === chatMsg.content || chatMsg.content.includes(m.content.replace('[uploading:', '').replace(']', '')))
@@ -148,7 +193,6 @@ export const useWebSocket = (token: string | null) => {
               updated[uploadIndex] = chatMsg;
               return updated;
             }
-
             return [...oldMessages, chatMsg];
           });
 
@@ -198,9 +242,6 @@ export const useWebSocket = (token: string | null) => {
               });
             }
           }
-        } else if (data.type === 'typing') {
-          const { channel_id, username } = data.payload;
-          useChatStore.getState().setTypingUser(channel_id, username, Date.now());
         } else if (data.type === 'online_list') {
           useChatStore.getState().setOnlineUsers(data.payload);
         } else if (data.type === 'user_status') {
@@ -276,15 +317,7 @@ export const useWebSocket = (token: string | null) => {
     }
   }, []);
 
-  // Hàm báo đang gõ chữ
-  const sendTyping = useCallback((channelId: string) => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({
-        type: 'typing',
-        payload: { channel_id: channelId }
-      }));
-    }
-  }, []);
+
 
   // Yêu cầu quyền thông báo từ trình duyệt khi khởi chạy
   useEffect(() => {
@@ -311,5 +344,6 @@ export const useWebSocket = (token: string | null) => {
     };
   }, [token, sendJson, setSendJsonMessage]);
 
-  return { sendMessage, sendTyping };
+  return { sendMessage };
+
 };

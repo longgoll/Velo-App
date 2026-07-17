@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { ChatMessage, WorkspaceMember } from '@/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { MessageSquare, Copy, Check, ArrowDownToLine, X } from 'lucide-react';
 import { getAvatarGradient } from '@/lib/utils';
-import { useChatStore } from '@/store/useChatStore';
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { parseImageContent, parseFileContent } from '../utils/mediaUtils';
 import {
   CallAttachment,
@@ -30,43 +29,38 @@ interface ExtendedChatMessage extends ChatMessage {
 interface MessageItemProps {
   msg: ExtendedChatMessage;
   onReplyClick: (msg: ChatMessage) => void;
+  members: WorkspaceMember[];
   isReplyChild?: boolean;
   unreadTimestamp?: string | number | null;
   isActiveThread?: boolean;
   hideReply?: boolean;
 }
 
-export default function MessageItem({
+// Safe timestamp conversion helper — hoisted ra ngoài component
+const getTimestampNum = (ts: string | number | null | undefined): number | null => {
+  if (ts === null || ts === undefined) return null;
+  return typeof ts === 'string' ? new Date(ts).getTime() : ts;
+};
+
+function MessageItemInner({
   msg,
   onReplyClick,
+  members,
   isReplyChild = false,
   unreadTimestamp = null,
   isActiveThread = false,
   hideReply = false,
 }: MessageItemProps) {
-  // Retrieve current user from local storage
-  const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
-
-  const activeWorkspaceId = useChatStore((state) => state.activeWorkspaceId);
-
-  const { data: members = [] } = useQuery<WorkspaceMember[]>({
-    queryKey: ['workspace-members', activeWorkspaceId],
-    queryFn: async () => {
-      const res = await api.get(`/workspaces/${activeWorkspaceId}/members`);
-      return res.data;
-    },
-    enabled: !!activeWorkspaceId,
-  });
+  const currentUser = useCurrentUser();
 
   const [copied, setCopied] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  const handleCopyLink = (url: string) => {
+  const handleCopyLink = useCallback((url: string) => {
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
+  }, []);
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -78,12 +72,6 @@ export default function MessageItem({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [lightboxOpen]);
-
-  // Safe timestamp conversion helper
-  const getTimestampNum = (ts: string | number | null | undefined): number | null => {
-    if (ts === null || ts === undefined) return null;
-    return typeof ts === 'string' ? new Date(ts).getTime() : ts;
-  };
 
   const msgTime = getTimestampNum(msg.timestamp);
   const unreadTime = getTimestampNum(unreadTimestamp);
@@ -303,3 +291,15 @@ export default function MessageItem({
     </div>
   );
 }
+
+export default React.memo(MessageItemInner, (prev, next) => {
+  // Custom comparator — chỉ re-render khi data thực sự thay đổi
+  return (
+    prev.msg === next.msg &&
+    prev.isActiveThread === next.isActiveThread &&
+    prev.unreadTimestamp === next.unreadTimestamp &&
+    prev.members === next.members &&
+    prev.hideReply === next.hideReply &&
+    prev.isReplyChild === next.isReplyChild
+  );
+});

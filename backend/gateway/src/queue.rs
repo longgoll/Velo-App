@@ -20,11 +20,7 @@ pub struct ChatMessage {
     pub message_type: Option<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct TypingMessage {
-    pub channel_id: String,
-    pub username: String,
-}
+
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PresenceMessage {
@@ -37,8 +33,7 @@ pub struct PresenceMessage {
 pub enum ChannelEvent {
     #[serde(rename = "message")]
     Message(ChatMessage),
-    #[serde(rename = "typing")]
-    Typing(TypingMessage),
+
     #[serde(rename = "presence")]
     Presence(PresenceMessage),
 }
@@ -70,19 +65,7 @@ impl QueueManager {
         Ok(())
     }
 
-    // Publish typing event lên Valkey Pub/Sub
-    pub async fn publish_typing(&self, channel_id: &str, username: &str) -> Result<(), redis::RedisError> {
-        let mut conn = self.redis_client.get_multiplexed_tokio_connection().await?;
-        let msg = TypingMessage {
-            channel_id: channel_id.to_string(),
-            username: username.to_string(),
-        };
-        let payload = serde_json::to_string(&msg).unwrap();
-        let pubsub_key = format!("typing:{}", channel_id);
-        
-        conn.publish::<_, _, ()>(pubsub_key, payload).await?;
-        Ok(())
-    }
+
 
     // Publish presence event lên Valkey
     pub async fn publish_presence(&self, username: &str, status: &str) -> Result<(), redis::RedisError> {
@@ -136,9 +119,9 @@ impl QueueManager {
         
         // Subscribe vào tất cả các kênh chat:*, typing:*, presence:*
         pubsub.psubscribe("chat:*").await?;
-        pubsub.psubscribe("typing:*").await?;
         pubsub.psubscribe("presence:*").await?;
-        info!("Successfully subscribed to Valkey Pub/Sub patterns: chat:*, typing:*, presence:*");
+        info!("Successfully subscribed to Valkey Pub/Sub patterns: chat:*, presence:*");
+
 
         let channels = self.channels.clone();
 
@@ -158,12 +141,6 @@ impl QueueManager {
                     if let Ok(chat_msg) = serde_json::from_str::<ChatMessage>(&payload) {
                         if let Some(tx) = channels.get(&chat_msg.channel_id) {
                             let _ = tx.send(ChannelEvent::Message(chat_msg));
-                        }
-                    }
-                } else if channel_name.starts_with("typing:") {
-                    if let Ok(typing_msg) = serde_json::from_str::<TypingMessage>(&payload) {
-                        if let Some(tx) = channels.get(&typing_msg.channel_id) {
-                            let _ = tx.send(ChannelEvent::Typing(typing_msg));
                         }
                     }
                 } else if channel_name == "presence:global" {

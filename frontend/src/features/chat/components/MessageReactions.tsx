@@ -1,11 +1,16 @@
+import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import type { ChatMessage } from '@/types';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import type { ChatMessage, ReactionSummary } from '@/types';
 
 interface MessageReactionsProps {
   msg: ChatMessage;
 }
 
 export function MessageReactions({ msg }: MessageReactionsProps) {
+  const queryClient = useQueryClient();
+  const currentUser = useCurrentUser();
+
   const handleToggleReaction = async (emoji: string) => {
     const reaction = msg.reactions?.find((r) => r.emoji === emoji);
     const hasMe = reaction?.me;
@@ -19,6 +24,58 @@ export function MessageReactions({ msg }: MessageReactionsProps) {
       timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp).getTime() : msg.timestamp,
     };
 
+    // ✅ Optimistic update — instant feedback
+    queryClient.setQueryData(['messages', msg.channel_id], (oldData: any) => {
+      const updateMsg = (m: ChatMessage) => {
+        if (m.id !== msg.id) return m;
+        const reactions = [...(m.reactions || [])];
+        const idx = reactions.findIndex((r) => r.emoji === emoji);
+
+        if (hasMe) {
+          // Remove reaction
+          if (idx !== -1) {
+            const updated: ReactionSummary = {
+              ...reactions[idx],
+              usernames: reactions[idx].usernames.filter((u) => u !== currentUser?.username),
+              me: false,
+            };
+            if (updated.usernames.length === 0) {
+              reactions.splice(idx, 1);
+            } else {
+              reactions[idx] = updated;
+            }
+          }
+        } else {
+          // Add reaction
+          if (idx !== -1) {
+            reactions[idx] = {
+              ...reactions[idx],
+              usernames: [...reactions[idx].usernames, currentUser?.username || ''],
+              me: true,
+            };
+          } else {
+            reactions.push({
+              emoji,
+              usernames: [currentUser?.username || ''],
+              me: true,
+            });
+          }
+        }
+        return { ...m, reactions };
+      };
+
+      if (!oldData) return oldData;
+      // Support InfiniteQuery pages structure
+      if (oldData.pages) {
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: ChatMessage[]) => page.map(updateMsg)),
+        };
+      }
+      // Legacy array
+      return (oldData as ChatMessage[]).map(updateMsg);
+    });
+
     try {
       if (hasMe) {
         await api.delete(url, { data: payload });
@@ -27,6 +84,8 @@ export function MessageReactions({ msg }: MessageReactionsProps) {
       }
     } catch (err) {
       console.error('Failed to toggle reaction:', err);
+      // Rollback on error
+      queryClient.invalidateQueries({ queryKey: ['messages', msg.channel_id] });
     }
   };
 

@@ -116,7 +116,8 @@ export function CallAttachment({ msg, callVideoMatch }: CallAttachmentProps) {
     staleTime: 3000,
   });
 
-  const channelMessages = queryClient.getQueryData<ChatMessage[]>(['messages', msg.channel_id]) || [];
+  const channelMessagesRaw = queryClient.getQueryData<{ pages: ChatMessage[][] }>(['messages', msg.channel_id]);
+  const channelMessages: ChatMessage[] = channelMessagesRaw?.pages ? channelMessagesRaw.pages.flat() : [];
   const latestCallMsg = [...channelMessages]
     .reverse()
     .find((m) => m.content.match(/^\[call:(voice|video):active\]/));

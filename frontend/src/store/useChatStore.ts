@@ -25,7 +25,7 @@ interface ChatStore {
   voiceMuted: boolean;
   voiceDeafened: boolean;
   recentConversations: RecentConversation[];
-  typingUsers: Record<string, Record<string, number>>;
+
   presenceUsers: Record<string, string>;
   lastRead: Record<string, number>;
 
@@ -46,7 +46,7 @@ interface ChatStore {
   setVoiceMuted: (muted: boolean) => void;
   setVoiceDeafened: (deafened: boolean) => void;
   addRecentConversation: (id: string, type: 'channel' | 'dm', workspaceId: string) => void;
-  setTypingUser: (channelId: string, username: string, timestamp: number) => void;
+
   setUserPresence: (username: string, status: string) => void;
   setOnlineUsers: (usernames: string[]) => void;
   sendJsonMessage: ((msg: any) => void) | null;
@@ -85,7 +85,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   incomingCall: null,
   voiceMuted: false,
   voiceDeafened: false,
-  typingUsers: {},
+
   presenceUsers: {},
   lastRead: (() => {
     if (typeof window !== 'undefined') {
@@ -235,15 +235,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   setShowCreateWs: (open) => set({ showCreateWs: open }),
   setShowJoinWs: (open) => set({ showJoinWs: open }),
   setShowCreateChan: (open) => set({ showCreateChan: open }),
-  setTypingUser: (channelId, username, timestamp) => set((state) => {
-    const channelTyping = { ...state.typingUsers[channelId], [username]: timestamp };
-    return {
-      typingUsers: {
-        ...state.typingUsers,
-        [channelId]: channelTyping
-      }
-    };
-  }),
+
   setUserPresence: (username, status) => set((state) => ({
     presenceUsers: { ...state.presenceUsers, [username]: status }
   })),
@@ -285,7 +277,7 @@ export const useChatStore = create<ChatStore>((set) => ({
       incomingCall: null,
       voiceMuted: false,
       voiceDeafened: false,
-      typingUsers: {},
+
       presenceUsers: {},
       lastRead: {},
     });

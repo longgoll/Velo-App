@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { CornerUpLeft, Smile, Copy, Check } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import api from '@/lib/api';
-import type { ChatMessage } from '@/types';
+import type { ChatMessage, ReactionSummary } from '@/types';
 
 interface MessageQuickActionsProps {
   msg: ChatMessage;
@@ -18,6 +20,8 @@ export function MessageQuickActions({
   const [copiedText, setCopiedText] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+  const currentUser = useCurrentUser();
 
   useEffect(() => {
     if (!showPicker) return;
@@ -36,6 +40,7 @@ export function MessageQuickActions({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showPicker]);
 
+  // ✅ Optimistic reaction toggle
   const handleToggleReaction = async (emoji: string) => {
     const reaction = msg.reactions?.find((r) => r.emoji === emoji);
     const hasMe = reaction?.me;
@@ -49,6 +54,54 @@ export function MessageQuickActions({
       timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp).getTime() : msg.timestamp,
     };
 
+    // Optimistic update
+    queryClient.setQueryData(['messages', msg.channel_id], (oldData: any) => {
+      const updateMsg = (m: ChatMessage) => {
+        if (m.id !== msg.id) return m;
+        const reactions = [...(m.reactions || [])];
+        const idx = reactions.findIndex((r) => r.emoji === emoji);
+
+        if (hasMe) {
+          if (idx !== -1) {
+            const updated: ReactionSummary = {
+              ...reactions[idx],
+              usernames: reactions[idx].usernames.filter((u) => u !== currentUser?.username),
+              me: false,
+            };
+            if (updated.usernames.length === 0) {
+              reactions.splice(idx, 1);
+            } else {
+              reactions[idx] = updated;
+            }
+          }
+        } else {
+          if (idx !== -1) {
+            reactions[idx] = {
+              ...reactions[idx],
+              usernames: [...reactions[idx].usernames, currentUser?.username || ''],
+              me: true,
+            };
+          } else {
+            reactions.push({
+              emoji,
+              usernames: [currentUser?.username || ''],
+              me: true,
+            });
+          }
+        }
+        return { ...m, reactions };
+      };
+
+      if (!oldData) return oldData;
+      if (oldData.pages) {
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: ChatMessage[]) => page.map(updateMsg)),
+        };
+      }
+      return (oldData as ChatMessage[]).map(updateMsg);
+    });
+
     try {
       if (hasMe) {
         await api.delete(url, { data: payload });
@@ -57,6 +110,7 @@ export function MessageQuickActions({
       }
     } catch (err) {
       console.error('Failed to toggle reaction:', err);
+      queryClient.invalidateQueries({ queryKey: ['messages', msg.channel_id] });
     }
   };
 

@@ -3,6 +3,7 @@ import { Send, Paperclip, Smile, Megaphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useChatStore } from '@/store/useChatStore';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { getAvatarGradient } from '@/lib/utils';
 import { useMentionAutocomplete } from '../hooks/useMentionAutocomplete';
 
@@ -13,7 +14,7 @@ interface ChatInputProps {
   channelName: string;
   onSendMessage: (channelId: string, content: string) => void;
   onFileUpload?: (file: File) => void;
-  onTyping?: () => void;
+
 }
 
 export default function ChatInput({
@@ -21,17 +22,16 @@ export default function ChatInput({
   channelName,
   onSendMessage,
   onFileUpload,
-  onTyping,
+
 }: ChatInputProps) {
   const [text, setText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const lastTypingSentRef = useRef<number>(0);
+
 
   const { activeWorkspaceId } = useChatStore();
-  const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+  const currentUser = useCurrentUser();
 
   // Use the extracted Mention Autocomplete hook
   const {
@@ -96,10 +96,6 @@ export default function ChatInput({
     const rawVal = e.target.value;
     const val = autoTransformEmotes(rawVal);
     setText(val);
-    if (onTyping && val.trim() && Date.now() - lastTypingSentRef.current > 2000) {
-      lastTypingSentRef.current = Date.now();
-      onTyping();
-    }
     const cursor = e.target.selectionStart;
     updateMentionStatus(val, cursor);
     setSelectedIndex(0);

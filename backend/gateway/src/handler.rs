@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn, error};
 use crate::client::GrpcClients;
 use crate::queue::{QueueManager, ChatMessage, ChannelEvent};
+
 use uuid::Uuid;
 use futures_util::{StreamExt, SinkExt};
 
@@ -22,8 +23,7 @@ pub enum ClientMsg {
     Subscribe { channel_id: String },
     #[serde(rename = "send_message")]
     SendMessage { channel_id: String, content: String },
-    #[serde(rename = "typing")]
-    Typing { channel_id: String },
+
     #[serde(rename = "set_status")]
     SetStatus { status: String },
 }
@@ -35,8 +35,7 @@ pub enum ServerMsg {
     Subscribed { channel_id: String },
     #[serde(rename = "message")]
     Message(ChatMessage),
-    #[serde(rename = "typing")]
-    Typing { channel_id: String, username: String },
+
     #[serde(rename = "user_status")]
     UserStatus { username: String, status: String },
     #[serde(rename = "online_list")]
@@ -192,13 +191,8 @@ async fn handle_socket(
                                             ChannelEvent::Message(chat_msg) => {
                                                 let _ = tx_out_local.send(ServerMsg::Message(chat_msg)).await;
                                             }
-                                            ChannelEvent::Typing(typing_msg) => {
-                                                let _ = tx_out_local.send(ServerMsg::Typing {
-                                                    channel_id: typing_msg.channel_id,
-                                                    username: typing_msg.username,
-                                                }).await;
-                                            }
                                             ChannelEvent::Presence(_) => {}
+
                                         }
                                     }
                                 });
@@ -238,17 +232,6 @@ async fn handle_socket(
                             _ => {
                                 let _ = tx_out_clone.send(ServerMsg::Error { message: "Unauthorized to send messages".to_string() }).await;
                             }
-                        }
-                    }
-                    ClientMsg::Typing { channel_id } => {
-                        // Kiểm tra quyền truy cập channel trước khi phát event typing
-                        match state_clone.grpc_clients.check_channel_access(&user_id_clone, &channel_id).await {
-                            Ok(res) if res.is_allowed => {
-                                if let Err(e) = state_clone.queue_manager.publish_typing(&channel_id, &username_clone).await {
-                                    error!("Failed to publish typing event: {:?}", e);
-                                }
-                            }
-                            _ => {}
                         }
                     }
                     ClientMsg::SetStatus { status } => {
