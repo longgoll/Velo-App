@@ -15,13 +15,14 @@ export default function WorkspaceSidebar() {
     setActiveChannelId
   } = useChatStore();
 
-  const { data: workspaces = [] } = useQuery<Workspace[]>({
+  const { data: workspacesData } = useQuery<Workspace[]>({
     queryKey: ['workspaces'],
     queryFn: async () => {
       const res = await api.get('/workspaces');
       return res.data;
     },
   });
+  const workspaces = workspacesData || [];
 
   // Fetch channels for all workspaces
   const channelsQueries = useQueries({

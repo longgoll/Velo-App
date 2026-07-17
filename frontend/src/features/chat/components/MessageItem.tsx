@@ -354,12 +354,12 @@ export default function MessageItem({
       const isUserInCall = useChatStore.getState().activeVoiceChannelId === msg.channel_id;
 
       return (
-        <div className="mt-2 flex items-center justify-between p-3.5 bg-zinc-950/50 rounded-2xl border border-zinc-800/80 max-w-sm hover:border-indigo-500/20 transition shadow-lg backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="mt-2 flex items-center justify-between p-3.5 bg-zinc-50 border border-zinc-200 dark:bg-zinc-950/40 dark:border-zinc-800/80 max-w-sm hover:border-indigo-500/20 transition shadow-lg backdrop-blur-sm animate-in fade-in duration-200">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
               isCallActive 
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 animate-pulse'
-                : 'bg-zinc-900 border-zinc-800 text-zinc-450'
+                : 'bg-white border-zinc-200 text-zinc-450 dark:bg-zinc-900 dark:border-zinc-800'
             }`}>
               {isVideo ? <Video className="w-5 h-5" /> : <PhoneCall className="w-5 h-5" />}
             </div>
@@ -492,10 +492,15 @@ export default function MessageItem({
       );
     }
 
+    const isSelf = msg.user_id === currentUser?.id;
     return (
-      <p className="text-zinc-300 text-sm mt-1 select-text break-words leading-relaxed">
+      <div className={`mt-1 px-3.5 py-1.5 rounded-2xl inline-block max-w-[85%] text-sm select-text break-words leading-relaxed ${
+        isSelf
+          ? 'bg-indigo-650 text-white shadow-sm shadow-indigo-600/10'
+          : 'bg-zinc-100 border border-zinc-200/60 text-zinc-800 dark:bg-zinc-950/45 dark:border-zinc-850 dark:text-zinc-300'
+      }`}>
         {renderTextWithMentions(msg.content, members)}
-      </p>
+      </div>
     );
   };
 

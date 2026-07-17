@@ -3,10 +3,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useChatStore } from '@/store/useChatStore';
 import api from '@/lib/api';
 import axios from 'axios';
-import { Hash, PhoneCall, Video, MessageSquare, Upload, Sparkles, Plus, Compass, Layers, ArrowDown } from 'lucide-react';
+import { Hash, PhoneCall, Video, MessageSquare, Upload, Sparkles, Plus, Compass, Layers, ArrowDown, Info } from 'lucide-react';
 import type { Channel, ChatMessage, Workspace, DMChannel } from '@/types';
 import MessageItem from './MessageItem';
 import ThreadSidebar from './ThreadSidebar';
+import DetailsSidebar from './DetailsSidebar';
 import ChatInput from './ChatInput';
 import DynamicIslandCall from '../../../components/ui/DynamicIslandCall';
 import VoiceRoomView from './VoiceRoomView';
@@ -114,6 +115,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   const parentRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isCallMaximized, setIsCallMaximized] = useState(false);
 
@@ -150,16 +152,17 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
   const prevChannelId = useRef<string | null>(null);
 
   // Fetch workspaces (cached from queryClient)
-  const { data: workspaces = [] } = useQuery<Workspace[]>({
+  const { data: workspacesData } = useQuery<Workspace[]>({
     queryKey: ['workspaces'],
     queryFn: async () => {
       const res = await api.get('/workspaces');
       return res.data;
     },
   });
+  const workspaces = workspacesData || [];
 
   // Fetch channels list to find active channel name
-  const { data: channels = [] } = useQuery<Channel[]>({
+  const { data: channelsData } = useQuery<Channel[]>({
     queryKey: ['channels', activeWorkspaceId],
     queryFn: async () => {
       const res = await api.get(`/workspaces/${activeWorkspaceId}/channels`);
@@ -167,11 +170,12 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     },
     enabled: !!activeWorkspaceId,
   });
+  const channels = channelsData || [];
 
   const activeChannel = channels.find((c) => c.id === activeChannelId);
 
   // Fetch active DM channels
-  const { data: dmChannels = [] } = useQuery<DMChannel[]>({
+  const { data: dmChannelsData } = useQuery<DMChannel[]>({
     queryKey: ['dms', activeWorkspaceId],
     queryFn: async () => {
       if (!activeWorkspaceId) return [];
@@ -180,12 +184,13 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     },
     enabled: !!activeWorkspaceId,
   });
+  const dmChannels = dmChannelsData || [];
 
   const activeDmChannel = dmChannels.find((d) => d.id === activeChannelId);
   const isVoiceOrDm = !!activeDmChannel || (!!activeChannel && activeChannel.type === 'voice');
 
   // Fetch active call participants for the current channel to show status banner
-  const { data: callParticipants = [] } = useQuery<any[]>({
+  const { data: callParticipantsData } = useQuery<any[]>({
     queryKey: ['call-participants', activeChannelId],
     queryFn: async () => {
       if (!activeChannelId || !activeWorkspaceId) return [];
@@ -199,9 +204,10 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     enabled: !!activeChannelId && !!activeWorkspaceId && isVoiceOrDm,
     refetchInterval: 3000, // Poll every 3 seconds to keep call banner and indicators snappy
   });
+  const callParticipants = callParticipantsData || [];
 
   // Fetch messages from ScyllaDB history via Core API
-  const { data: messages = [] } = useQuery<ChatMessage[]>({
+  const { data: messagesData } = useQuery<ChatMessage[]>({
     queryKey: ['messages', activeChannelId],
     queryFn: async () => {
       if (!activeChannelId) return [];
@@ -212,6 +218,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
     },
     enabled: !!activeChannelId,
   });
+  const messages = messagesData || [];
 
   // Intercept sending messages to handle reply prefixes
   const handleSendMessage = (channelId: string, content: string) => {
@@ -676,13 +683,22 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
         <div className="px-6 h-[52px] border-b border-zinc-950/80 flex items-center justify-between bg-zinc-900/40 backdrop-blur-md shadow-sm shrink-0 z-10">
           <div className="flex items-center gap-2 min-w-0">
             {activeDmChannel ? (
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
             ) : (
               <Hash className="w-5 h-5 text-zinc-500 shrink-0" />
             )}
             <span className="font-bold text-white text-sm truncate">
               {chatTitle}
             </span>
+            {activeDmChannel ? (
+              <span className="text-[8px] font-bold text-emerald-450 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full select-none ml-2 uppercase tracking-wide">
+                Trực tuyến
+              </span>
+            ) : (
+              <span className="text-[8px] font-bold text-indigo-450 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded-full select-none ml-2 uppercase tracking-wide">
+                Hoạt động
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -704,6 +720,22 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
                 </button>
               </>
             )}
+            
+            <button
+              onClick={() => {
+                setShowDetails(!showDetails);
+                setActiveThreadId(null);
+              }}
+              className={`p-2 rounded-full transition outline-none border-0 cursor-pointer ${
+                showDetails 
+                  ? 'bg-indigo-600/15 text-indigo-400 hover:bg-indigo-500/25' 
+                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+              }`}
+              title="Thông tin nhóm / bạn bè"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+
             <button
               onClick={toggleExplorer}
               className="px-3 py-1 bg-zinc-800/80 text-xs text-zinc-300 rounded-lg hover:bg-zinc-700 hover:text-white transition outline-none border-0 cursor-pointer"
@@ -822,6 +854,7 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
                             }
                           }
                           setActiveThreadId(currentMsg.id);
+                          setShowDetails(false);
                         }}
                         unreadTimestamp={unreadTimestamp}
                         isActiveThread={activeThreadId === msg.id}
@@ -878,8 +911,8 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
         )}
       </div>
 
-      {/* Thread Sidebar Panel */}
-      {activeThreadMessage && !isCallMaximized && (
+      {/* Dynamic Right Sidebar Panel (Thread or Details) */}
+      {activeThreadMessage && !isCallMaximized ? (
         <ThreadSidebar
           parentMessage={activeThreadMessage}
           onClose={() => setActiveThreadId(null)}
@@ -887,7 +920,12 @@ export default function ChatViewport({ onSendMessage, onSendTyping }: ChatViewpo
           currentUser={currentUser}
           unreadTimestamp={unreadTimestamp}
         />
-      )}
+      ) : showDetails && !isCallMaximized ? (
+        <DetailsSidebar
+          onClose={() => setShowDetails(false)}
+          messages={messages}
+        />
+      ) : null}
     </div>
   );
 }

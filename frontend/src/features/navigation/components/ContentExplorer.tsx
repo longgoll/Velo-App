@@ -175,13 +175,14 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
   }, [toggleExplorer]);
 
   // Fetch workspaces (cached)
-  const { data: workspaces = [] } = useQuery<Workspace[]>({
+  const { data: workspacesData } = useQuery<Workspace[]>({
     queryKey: ['workspaces'],
     queryFn: async () => {
       const res = await api.get('/workspaces');
       return res.data;
     },
   });
+  const workspaces = workspacesData || [];
 
   // Fetch channels for all workspaces
   const allWorkspaceChannelsQueries = useQueries({
@@ -254,7 +255,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
 
   // Fetch channels for active workspace
-  const { data: channels = [], isLoading: isChannelsLoading } = useQuery<Channel[]>({
+  const { data: channelsData, isLoading: isChannelsLoading } = useQuery<Channel[]>({
     queryKey: ['channels', activeWorkspaceId],
     queryFn: async () => {
       const res = await api.get(`/workspaces/${activeWorkspaceId}/channels`);
@@ -262,9 +263,10 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
     },
     enabled: !!activeWorkspaceId && activeFilter === 'workspaces',
   });
+  const channels = channelsData || [];
 
   // Fetch workspace members to initiate DM
-  const { data: members = [] } = useQuery<WorkspaceMember[]>({
+  const { data: membersData } = useQuery<WorkspaceMember[]>({
     queryKey: ['workspace-members', activeWorkspaceId],
     queryFn: async () => {
       if (!activeWorkspaceId) return [];
@@ -273,9 +275,10 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
     },
     enabled: !!activeWorkspaceId,
   });
+  const members = membersData || [];
 
   // Fetch active DM channels
-  const { data: dmChannels = [], refetch: refetchDms } = useQuery<DMChannel[]>({
+  const { data: dmChannelsData, refetch: refetchDms } = useQuery<DMChannel[]>({
     queryKey: ['dms', activeWorkspaceId],
     queryFn: async () => {
       if (!activeWorkspaceId) return [];
@@ -284,6 +287,7 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
     },
     enabled: !!activeWorkspaceId && activeFilter === 'dms',
   });
+  const dmChannels = dmChannelsData || [];
 
   // Current logged in user info
 
@@ -542,11 +546,11 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
                   <div>
                     <div 
                       onClick={() => setTextFolderOpen(!textFolderOpen)}
-                      className="flex items-center justify-between px-2 py-1 mb-1 text-zinc-500 hover:text-zinc-300 cursor-pointer rounded transition group"
+                      className="flex items-center justify-between px-2.5 py-1.5 mb-1.5 text-zinc-550 hover:text-zinc-300 dark:hover:text-zinc-200 hover:bg-zinc-800/10 dark:hover:bg-zinc-800/20 cursor-pointer rounded-lg transition group"
                     >
-                      <div className="flex items-center gap-1.5">
-                        {textFolderOpen ? <ChevronDown className="w-3 h-3 text-zinc-500" /> : <ChevronRight className="w-3 h-3 text-zinc-500" />}
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Kênh chữ</span>
+                      <div className="flex items-center gap-2">
+                        {textFolderOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+                        <span className="text-[9.5px] font-extrabold uppercase tracking-wider">Kênh chữ</span>
                       </div>
                       {isOwnerOrAdmin && (
                         <button
@@ -586,11 +590,11 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
                   <div>
                     <div 
                       onClick={() => setVoiceFolderOpen(!voiceFolderOpen)}
-                      className="flex items-center justify-between px-2 py-1 mb-1 text-zinc-500 hover:text-zinc-300 cursor-pointer rounded transition group"
+                      className="flex items-center justify-between px-2.5 py-1.5 mb-1.5 text-zinc-550 hover:text-zinc-300 dark:hover:text-zinc-200 hover:bg-zinc-800/10 dark:hover:bg-zinc-800/20 cursor-pointer rounded-lg transition group"
                     >
-                      <div className="flex items-center gap-1.5">
-                        {voiceFolderOpen ? <ChevronDown className="w-3 h-3 text-zinc-500" /> : <ChevronRight className="w-3 h-3 text-zinc-500" />}
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Kênh thoại</span>
+                      <div className="flex items-center gap-2">
+                        {voiceFolderOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+                        <span className="text-[9.5px] font-extrabold uppercase tracking-wider">Kênh thoại</span>
                       </div>
                       {isOwnerOrAdmin && (
                         <button
@@ -646,15 +650,15 @@ export default function ContentExplorer({ onLogout }: ContentExplorerProps) {
             </div>
 
             {/* Search DM input */}
-            <div className="p-2 border-b border-zinc-950/20">
-              <div className="relative flex items-center bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs">
-                <Search className="w-3.5 h-3.5 text-zinc-500 mr-1.5 shrink-0" />
+            <div className="px-3 py-2.5 border-b border-zinc-950/20">
+              <div className="relative flex items-center bg-zinc-100 border border-zinc-200/60 dark:bg-zinc-950 dark:border-zinc-850 rounded-full px-3 py-1.5 text-xs focus-within:ring-1 focus-within:ring-indigo-500/20 focus-within:border-indigo-500/40 transition duration-150">
+                <Search className="w-3.5 h-3.5 text-zinc-400 mr-2 shrink-0" />
                 <input
                   type="text"
                   value={dmSearch}
                   onChange={(e) => setDmSearch(e.target.value)}
                   placeholder="Tìm kiếm bạn bè..."
-                  className="bg-transparent border-0 text-white outline-none w-full placeholder-zinc-600 py-0.5 text-xs"
+                  className="bg-transparent border-0 text-zinc-800 dark:text-white outline-none w-full placeholder-zinc-400 dark:placeholder-zinc-600 py-0 text-xs"
                 />
               </div>
             </div>
